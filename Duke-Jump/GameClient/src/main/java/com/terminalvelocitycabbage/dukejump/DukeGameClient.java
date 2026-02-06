@@ -32,6 +32,7 @@ import com.terminalvelocitycabbage.engine.util.HeterogeneousMap;
 import com.terminalvelocitycabbage.templates.ecs.components.*;
 import com.terminalvelocitycabbage.templates.events.*;
 import com.terminalvelocitycabbage.templates.meshes.SquareDataMesh;
+import org.joml.Vector2f;
 
 import java.util.List;
 
@@ -81,7 +82,7 @@ public class DukeGameClient extends ClientBase {
     public static Identifier PLAYER_CAMERA_ENTITY;
 
     //Game Configuration
-    public static final float MOVEMENT_SPEED = -0.8f;
+    public static float MOVEMENT_SPEED = -0.8f;
     public static final float GRAVITY = 0.005f;
     public static final float JUMP_FORCE = 1.25f;
     public static final float SCALE = 60f;
@@ -93,6 +94,7 @@ public class DukeGameClient extends ClientBase {
     public static final int BUG_FREQUENCY = 1000; //duration in ms between bug spawns
     public static final float BACKGROUND_SPEED_MULTIPLIER = 0.2f;
     public static final int BACKGROUND_PARTS = 5;
+    public static final float INTERSECTION_RADIUS = SCALE / 2f;
 
     public DukeGameClient(String namespace, int ticksPerSecond) {
         super(namespace, ticksPerSecond);
@@ -174,6 +176,7 @@ public class DukeGameClient extends ClientBase {
             event.createSystem(UpdateBugPositionSystem.class);
             event.createSystem(SpawnBugSystem.class);
             event.createSystem(UpdateBackgroundPositionsSystem.class);
+            event.createSystem(CheckForCollisionSystem.class);
         });
         getEventDispatcher().listenToEvent(EntityTemplateRegistrationEvent.EVENT, e -> {
             EntityTemplateRegistrationEvent event = (EntityTemplateRegistrationEvent) e;
@@ -211,6 +214,7 @@ public class DukeGameClient extends ClientBase {
                     .addStep(event.registerStep(ID, "update_bug_positions"), UpdateBugPositionSystem.class)
                     .addStep(event.registerStep(ID, "spawn_bug"), SpawnBugSystem.class)
                     .addStep(event.registerStep(ID, "update_background_positions"), UpdateBackgroundPositionsSystem.class)
+                    .addStep(event.registerStep(ID, "check_for_collision"), CheckForCollisionSystem.class)
                     .build());
         });
         getEventDispatcher().listenToEvent(RendererRegistrationEvent.EVENT, e -> {
@@ -349,6 +353,32 @@ public class DukeGameClient extends ClientBase {
                 transformation.translate(deltaTime * MOVEMENT_SPEED * BACKGROUND_SPEED_MULTIPLIER, 0, 0);
                 if (transformation.getPosition().x < (-SCALE - 600)) transformation.translate(SCALE*8*BACKGROUND_PARTS, 0, 0);
             });
+        }
+    }
+
+    public static class CheckForCollisionSystem extends System {
+
+        @Override
+        public void update(Manager manager, float deltaTime) {
+
+            var player = manager.getFirstEntityWith(VelocityComponent.class, TransformationComponent.class);
+            var transformation = player.getComponent(TransformationComponent.class);
+            var playerX = transformation.getPosition().x;
+            var playerY = transformation.getPosition().y;
+
+            for (Entity entity : manager.getEntitiesWith(BugComponent.class, TransformationComponent.class)) {
+                var entityTransformation = entity.getComponent(TransformationComponent.class);
+                var bugX = entityTransformation.getPosition().x;
+                var bugY = entityTransformation.getPosition().y;
+                if (intersects(playerX, playerY, bugX, bugY)) {
+                    MOVEMENT_SPEED = 0;
+                }
+            }
+
+        }
+
+        private boolean intersects(float playerX, float playerY, float bugX, float bugY) {
+            return Vector2f.distanceSquared(playerX, playerY, bugX, bugY) <= (INTERSECTION_RADIUS * INTERSECTION_RADIUS);
         }
     }
 
