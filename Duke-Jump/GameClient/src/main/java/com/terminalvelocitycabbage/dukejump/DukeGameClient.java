@@ -269,7 +269,9 @@ public class DukeGameClient extends ClientBase {
         public void update(Manager manager, float deltaTime) {
             manager.getEntitiesWith(VelocityComponent.class, TransformationComponent.class).forEach(entity -> {
                 var velocity = entity.getComponent(VelocityComponent.class).getVelocity();
-                entity.getComponent(TransformationComponent.class).translate(velocity.x * deltaTime, velocity.y * deltaTime, velocity.z * deltaTime);
+                var transformationComponent = entity.getComponent(TransformationComponent.class);
+                transformationComponent.translate(velocity.x * deltaTime, velocity.y * deltaTime, velocity.z * deltaTime);
+                if (transformationComponent.getPosition().y < GROUND_Y) transformationComponent.setPosition(transformationComponent.getPosition().x, GROUND_Y, transformationComponent.getPosition().z);
             });
         }
     }
