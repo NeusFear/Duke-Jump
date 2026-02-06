@@ -17,6 +17,7 @@ import com.terminalvelocitycabbage.engine.client.renderer.shader.Uniform;
 import com.terminalvelocitycabbage.engine.client.scene.Scene;
 import com.terminalvelocitycabbage.engine.client.window.WindowProperties;
 import com.terminalvelocitycabbage.engine.debug.Log;
+import com.terminalvelocitycabbage.engine.ecs.Component;
 import com.terminalvelocitycabbage.engine.ecs.Entity;
 import com.terminalvelocitycabbage.engine.ecs.Manager;
 import com.terminalvelocitycabbage.engine.ecs.System;
@@ -35,8 +36,6 @@ import java.util.List;
 
 import static org.lwjgl.opengl.GL11C.glClearColor;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class DukeGameClient extends ClientBase {
 
     //This client's identifier (namespace)
@@ -52,11 +51,13 @@ public class DukeGameClient extends ClientBase {
 
     //Textures and atlases
     public static Identifier DUKE_TEXTURE;
+    public static Identifier GROUND_TEXTURE;
     public static Identifier TEXTURE_ATLAS;
 
     //Meshes and Models
     public static Identifier SPRITE_MESH;
     public static Identifier DUKE_MODEL;
+    public static Identifier GROUND_MODEL;
 
     //Renderer configs
     public static final VertexFormat MESH_FORMAT = VertexFormat.builder()
@@ -69,7 +70,16 @@ public class DukeGameClient extends ClientBase {
 
     //Entity stuff
     public static Identifier DUKE_ENTITY;
+    public static Identifier GROUND_ENTITY;
     public static Identifier PLAYER_CAMERA_ENTITY;
+
+    //Game Configuration
+    public static final float MOVEMENT_SPEED = -0.8f;
+    public static final float GRAVITY = 9.8E-4f;
+    public static final float JUMP_FORCE = .5f;
+    public static final float SCALE = 120f;
+    public static final int GROUND_Y = -0;
+    public static final int PLAYER_POSITION_X = -200;
 
     public DukeGameClient(String namespace, int ticksPerSecond) {
         super(namespace, ticksPerSecond);
@@ -106,12 +116,14 @@ public class DukeGameClient extends ClientBase {
         getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.TEXTURE), e -> {
             //Register texture resources
             DUKE_TEXTURE = ((ResourceRegistrationEvent) e).registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke.png").getIdentifier();
+            GROUND_TEXTURE = ((ResourceRegistrationEvent) e).registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "ground.png").getIdentifier();
         });
         getEventDispatcher().listenToEvent(ConfigureTexturesEvent.EVENT, e -> {
             ConfigureTexturesEvent event = (ConfigureTexturesEvent) e;
             //Register a default atlas
             TEXTURE_ATLAS = event.registerAtlas(ID, "atlas");
             //Add textures to atlas
+            event.addTexture(GROUND_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_TEXTURE, TEXTURE_ATLAS);
         });
         getEventDispatcher().listenToEvent(MeshRegistrationEvent.EVENT, e -> {
@@ -120,7 +132,8 @@ public class DukeGameClient extends ClientBase {
         });
         getEventDispatcher().listenToEvent(ModelConfigRegistrationEvent.EVENT, e -> {
             ModelConfigRegistrationEvent event = (ModelConfigRegistrationEvent) e;
-            DUKE_MODEL = event.registerModel(ID, "brid", SPRITE_MESH, DUKE_TEXTURE);
+            DUKE_MODEL = event.registerModel(ID, "duke", SPRITE_MESH, DUKE_TEXTURE);
+            GROUND_MODEL = event.registerModel(ID, "ground", SPRITE_MESH, GROUND_TEXTURE);
         });
         getEventDispatcher().listenToEvent(EntityComponentRegistrationEvent.EVENT, e -> {
             EntityComponentRegistrationEvent event = (EntityComponentRegistrationEvent) e;
@@ -129,22 +142,29 @@ public class DukeGameClient extends ClientBase {
             event.registerComponent(PositionComponent.class);
             event.registerComponent(FixedOrthoCameraComponent.class);
             event.registerComponent(VelocityComponent.class);
+            event.registerComponent(GroundComponent.class);
         });
         getEventDispatcher().listenToEvent(EntitySystemRegistrationEvent.EVENT, e -> {
             EntitySystemRegistrationEvent event = (EntitySystemRegistrationEvent) e;
             event.createSystem(GravitySystem.class);
             event.createSystem(AccelerationSystem.class);
+            event.createSystem(UpdateGroundPositionsSystem.class);
         });
         getEventDispatcher().listenToEvent(EntityTemplateRegistrationEvent.EVENT, e -> {
             EntityTemplateRegistrationEvent event = (EntityTemplateRegistrationEvent) e;
             DUKE_ENTITY = event.createEntityTemplate(ID, "duke", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(DUKE_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(-200, 0, -2).setScale(120f);
+                entity.addComponent(TransformationComponent.class).setPosition(PLAYER_POSITION_X, 0, 0).setScale(SCALE);
                 entity.addComponent(VelocityComponent.class).setVelocity(0, .5f, 0);
             });
             PLAYER_CAMERA_ENTITY = event.createEntityTemplate(ID, "player_camera", entity -> {
-                entity.addComponent(PositionComponent.class);
+                entity.addComponent(PositionComponent.class).setPosition(0, 0, -100);
                 entity.addComponent(FixedOrthoCameraComponent.class);
+            });
+            GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
+                entity.addComponent(ModelComponent.class).setModel(GROUND_MODEL);
+                entity.addComponent(TransformationComponent.class).setPosition(0, -300, 0).setScale(SCALE*4f);
+                entity.addComponent(GroundComponent.class);
             });
         });
         getEventDispatcher().listenToEvent(RoutineRegistrationEvent.EVENT, e -> {
@@ -152,6 +172,7 @@ public class DukeGameClient extends ClientBase {
             DEFAULT_ROUTINE = event.registerRoutine(Routine.builder(ID, "update_duke_positions")
                     .addStep(event.registerStep(ID, "gravity"), GravitySystem.class)
                     .addStep(event.registerStep(ID, "acceleration"), AccelerationSystem.class)
+                    .addStep(event.registerStep(ID, "update_ground_positions"), UpdateGroundPositionsSystem.class)
                     .build());
             Log.info(DEFAULT_ROUTINE);
         });
@@ -196,6 +217,78 @@ public class DukeGameClient extends ClientBase {
         long window = getWindowManager().createNewWindow(windowProperties);
         //Focus window
         getWindowManager().focusWindow(window);
+    }
+
+    public static class DefaultScene extends Scene {
+
+        public DefaultScene(Identifier renderGraph, List<Routine> routines) {
+            super(renderGraph, routines);
+        }
+
+        @Override
+        public void init() {
+            var client = DukeGameClient.getInstance();
+            var manager = client.getManager();
+
+            client.getTextureCache().generateAtlas(TEXTURE_ATLAS);
+            setMeshCache(new MeshCache(client.getModelRegistry(), client.getMeshRegistry(), client.getTextureCache()));
+
+            manager.createEntityFromTemplate(DUKE_ENTITY);
+            manager.createEntityFromTemplate(PLAYER_CAMERA_ENTITY);
+            manager.createEntityFromTemplate(GROUND_ENTITY);
+            manager.createEntityFromTemplate(GROUND_ENTITY).getComponent(TransformationComponent.class).translate(SCALE*4, 0, 0);
+            manager.createEntityFromTemplate(GROUND_ENTITY).getComponent(TransformationComponent.class).translate(SCALE*4*2, 0, 0);
+        }
+
+        @Override
+        public void cleanup() {
+            var client = DukeGameClient.getInstance();
+            client.getTextureCache().cleanupAtlas(TEXTURE_ATLAS);
+            getMeshCache().cleanup();
+        }
+    }
+
+    public static class GravitySystem extends System {
+
+        @Override
+        public void update(Manager manager, float deltaTime) {
+            manager.getEntitiesWith(VelocityComponent.class).forEach(entity -> {
+                if (entity.getComponent(TransformationComponent.class).getPosition().y < GROUND_Y) {
+                    entity.getComponent(VelocityComponent.class).setVelocity(0, 0, 0);
+                    entity.getComponent(TransformationComponent.class).setPosition(PLAYER_POSITION_X, GROUND_Y, 0);
+                } else {
+                    entity.getComponent(VelocityComponent.class).addVelocity(0, -GRAVITY * deltaTime, 0);
+                }
+            });
+        }
+    }
+
+    public static class AccelerationSystem extends System {
+
+        @Override
+        public void update(Manager manager, float deltaTime) {
+            manager.getEntitiesWith(VelocityComponent.class, TransformationComponent.class).forEach(entity -> {
+                var velocity = entity.getComponent(VelocityComponent.class).getVelocity();
+                entity.getComponent(TransformationComponent.class).translate(velocity.x * deltaTime, velocity.y * deltaTime, velocity.z * deltaTime);
+            });
+        }
+    }
+
+    public static class UpdateGroundPositionsSystem extends System {
+
+        @Override
+        public void update(Manager manager, float deltaTime) {
+            manager.getEntitiesWith(GroundComponent.class, TransformationComponent.class).forEach(entity -> {
+                var transformation = entity.getComponent(TransformationComponent.class);
+                transformation.translate(deltaTime * MOVEMENT_SPEED, 0, 0);
+                if (transformation.getPosition().x < (-SCALE - 600)) transformation.translate(SCALE*4*3, 0, 0);
+            });
+        }
+    }
+
+    public static class GroundComponent implements Component {
+        @Override
+        public void setDefaults() { }
     }
 
     public static class DrawSceneRenderNode extends RenderNode {
@@ -243,55 +336,6 @@ public class DukeGameClient extends ClientBase {
         }
     }
 
-    public static class DefaultScene extends Scene {
-
-        public DefaultScene(Identifier renderGraph, List<Routine> routines) {
-            super(renderGraph, routines);
-        }
-
-        @Override
-        public void init() {
-            var client = DukeGameClient.getInstance();
-            var manager = client.getManager();
-
-            client.getTextureCache().generateAtlas(TEXTURE_ATLAS);
-            setMeshCache(new MeshCache(client.getModelRegistry(), client.getMeshRegistry(), client.getTextureCache()));
-
-            manager.createEntityFromTemplate(DUKE_ENTITY);
-            manager.createEntityFromTemplate(PLAYER_CAMERA_ENTITY);
-        }
-
-        @Override
-        public void cleanup() {
-            var client = DukeGameClient.getInstance();
-            client.getTextureCache().cleanupAtlas(TEXTURE_ATLAS);
-            getMeshCache().cleanup();
-        }
-    }
-
-    public static class GravitySystem extends System {
-
-        private static final float GRAVITY = 9.8E-4f;
-
-        @Override
-        public void update(Manager manager, float deltaTime) {
-            manager.getEntitiesWith(VelocityComponent.class).forEach(entity -> {
-                entity.getComponent(VelocityComponent.class).addVelocity(0, -GRAVITY * deltaTime, 0);
-            });
-        }
-    }
-
-    public static class AccelerationSystem extends System {
-
-        @Override
-        public void update(Manager manager, float deltaTime) {
-            manager.getEntitiesWith(VelocityComponent.class, TransformationComponent.class).forEach(entity -> {
-                var velocity = entity.getComponent(VelocityComponent.class).getVelocity();
-                entity.getComponent(TransformationComponent.class).translate(velocity.x * deltaTime, velocity.y * deltaTime, velocity.z * deltaTime);
-            });
-        }
-    }
-
     public static class CloseGameController extends BooleanController {
 
         public CloseGameController(Control... controls) {
@@ -315,7 +359,9 @@ public class DukeGameClient extends ClientBase {
             if (isEnabled()) {
                 var manager = ClientBase.getInstance().getManager();
                 manager.getEntitiesWith(TransformationComponent.class, VelocityComponent.class).forEach(entity -> {
-                    entity.getComponent(VelocityComponent.class).setVelocity(0, .5f, 0);
+                    if (entity.getComponent(TransformationComponent.class).getPosition().y <= GROUND_Y) {
+                        entity.getComponent(VelocityComponent.class).setVelocity(0, JUMP_FORCE, 0);
+                    }
                 });
             }
         }
