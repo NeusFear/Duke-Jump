@@ -11,6 +11,7 @@ import com.terminalvelocitycabbage.engine.client.renderer.elements.VertexAttribu
 import com.terminalvelocitycabbage.engine.client.renderer.elements.VertexFormat;
 import com.terminalvelocitycabbage.engine.client.renderer.model.Mesh;
 import com.terminalvelocitycabbage.engine.client.renderer.model.MeshCache;
+import com.terminalvelocitycabbage.engine.client.renderer.model.Model;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.Shader;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.ShaderProgramConfig;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.Uniform;
@@ -53,11 +54,13 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DUKE_TEXTURE;
     public static Identifier GROUND_TEXTURE;
     public static Identifier TEXTURE_ATLAS;
+    public static Identifier BUG_TEXTURE;
 
     //Meshes and Models
     public static Identifier SPRITE_MESH;
     public static Identifier DUKE_MODEL;
     public static Identifier GROUND_MODEL;
+    public static Identifier BUG_MODEL;
 
     //Renderer configs
     public static final VertexFormat MESH_FORMAT = VertexFormat.builder()
@@ -71,15 +74,20 @@ public class DukeGameClient extends ClientBase {
     //Entity stuff
     public static Identifier DUKE_ENTITY;
     public static Identifier GROUND_ENTITY;
+    public static Identifier BUG_ENTITY;
     public static Identifier PLAYER_CAMERA_ENTITY;
 
     //Game Configuration
     public static final float MOVEMENT_SPEED = -0.8f;
-    public static final float GRAVITY = 9.8E-4f;
-    public static final float JUMP_FORCE = .5f;
-    public static final float SCALE = 120f;
-    public static final int GROUND_Y = -0;
+    public static final float GRAVITY = 0.005f;
+    public static final float JUMP_FORCE = 1.25f;
+    public static final float SCALE = 60f;
+    public static final int GROUND_PARTS = 8;
+    public static final int GROUND_Y = -100;
     public static final int PLAYER_POSITION_X = -200;
+    public static final int BUG_START_POSITION_X = 500;
+    public static final float BUG_SPEED_MULTIPLIER = 1.2f;
+    public static final int BUG_FREQUENCY = 1000; //duration in ms between bug spawns
 
     public DukeGameClient(String namespace, int ticksPerSecond) {
         super(namespace, ticksPerSecond);
@@ -117,6 +125,7 @@ public class DukeGameClient extends ClientBase {
             //Register texture resources
             DUKE_TEXTURE = ((ResourceRegistrationEvent) e).registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke.png").getIdentifier();
             GROUND_TEXTURE = ((ResourceRegistrationEvent) e).registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "ground.png").getIdentifier();
+            BUG_TEXTURE = ((ResourceRegistrationEvent) e).registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "bug.png").getIdentifier();
         });
         getEventDispatcher().listenToEvent(ConfigureTexturesEvent.EVENT, e -> {
             ConfigureTexturesEvent event = (ConfigureTexturesEvent) e;
@@ -125,6 +134,7 @@ public class DukeGameClient extends ClientBase {
             //Add textures to atlas
             event.addTexture(GROUND_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_TEXTURE, TEXTURE_ATLAS);
+            event.addTexture(BUG_TEXTURE, TEXTURE_ATLAS);
         });
         getEventDispatcher().listenToEvent(MeshRegistrationEvent.EVENT, e -> {
             MeshRegistrationEvent event = (MeshRegistrationEvent) e;
@@ -134,6 +144,7 @@ public class DukeGameClient extends ClientBase {
             ModelConfigRegistrationEvent event = (ModelConfigRegistrationEvent) e;
             DUKE_MODEL = event.registerModel(ID, "duke", SPRITE_MESH, DUKE_TEXTURE);
             GROUND_MODEL = event.registerModel(ID, "ground", SPRITE_MESH, GROUND_TEXTURE);
+            BUG_MODEL = event.registerModel(ID, "bug", SPRITE_MESH, BUG_TEXTURE);
         });
         getEventDispatcher().listenToEvent(EntityComponentRegistrationEvent.EVENT, e -> {
             EntityComponentRegistrationEvent event = (EntityComponentRegistrationEvent) e;
@@ -143,19 +154,22 @@ public class DukeGameClient extends ClientBase {
             event.registerComponent(FixedOrthoCameraComponent.class);
             event.registerComponent(VelocityComponent.class);
             event.registerComponent(GroundComponent.class);
+            event.registerComponent(BugComponent.class);
         });
         getEventDispatcher().listenToEvent(EntitySystemRegistrationEvent.EVENT, e -> {
             EntitySystemRegistrationEvent event = (EntitySystemRegistrationEvent) e;
             event.createSystem(GravitySystem.class);
             event.createSystem(AccelerationSystem.class);
             event.createSystem(UpdateGroundPositionsSystem.class);
+            event.createSystem(UpdateBugPositionSystem.class);
+            event.createSystem(SpawnBugSystem.class);
         });
         getEventDispatcher().listenToEvent(EntityTemplateRegistrationEvent.EVENT, e -> {
             EntityTemplateRegistrationEvent event = (EntityTemplateRegistrationEvent) e;
             DUKE_ENTITY = event.createEntityTemplate(ID, "duke", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(DUKE_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(PLAYER_POSITION_X, 0, 0).setScale(SCALE);
-                entity.addComponent(VelocityComponent.class).setVelocity(0, .5f, 0);
+                entity.addComponent(TransformationComponent.class).setPosition(PLAYER_POSITION_X, GROUND_Y, 0).setScale(SCALE);
+                entity.addComponent(VelocityComponent.class);
             });
             PLAYER_CAMERA_ENTITY = event.createEntityTemplate(ID, "player_camera", entity -> {
                 entity.addComponent(PositionComponent.class).setPosition(0, 0, -100);
@@ -163,8 +177,13 @@ public class DukeGameClient extends ClientBase {
             });
             GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(GROUND_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(0, -300, 0).setScale(SCALE*4f);
+                entity.addComponent(TransformationComponent.class).setPosition(0, GROUND_Y - 150, 0).setScale(SCALE*4f);
                 entity.addComponent(GroundComponent.class);
+            });
+            BUG_ENTITY = event.createEntityTemplate(ID, "bug", entity -> {
+                entity.addComponent(ModelComponent.class).setModel(BUG_MODEL);
+                entity.addComponent(BugComponent.class);
+                entity.addComponent(TransformationComponent.class).setPosition(BUG_START_POSITION_X, GROUND_Y, 0).setScale(SCALE);
             });
         });
         getEventDispatcher().listenToEvent(RoutineRegistrationEvent.EVENT, e -> {
@@ -173,6 +192,8 @@ public class DukeGameClient extends ClientBase {
                     .addStep(event.registerStep(ID, "gravity"), GravitySystem.class)
                     .addStep(event.registerStep(ID, "acceleration"), AccelerationSystem.class)
                     .addStep(event.registerStep(ID, "update_ground_positions"), UpdateGroundPositionsSystem.class)
+                    .addStep(event.registerStep(ID, "update_bug_positions"), UpdateBugPositionSystem.class)
+                    .addStep(event.registerStep(ID, "spawn_bug"), SpawnBugSystem.class)
                     .build());
             Log.info(DEFAULT_ROUTINE);
         });
@@ -235,9 +256,9 @@ public class DukeGameClient extends ClientBase {
 
             manager.createEntityFromTemplate(DUKE_ENTITY);
             manager.createEntityFromTemplate(PLAYER_CAMERA_ENTITY);
-            manager.createEntityFromTemplate(GROUND_ENTITY);
-            manager.createEntityFromTemplate(GROUND_ENTITY).getComponent(TransformationComponent.class).translate(SCALE*4, 0, 0);
-            manager.createEntityFromTemplate(GROUND_ENTITY).getComponent(TransformationComponent.class).translate(SCALE*4*2, 0, 0);
+            for (int i = 0; i < GROUND_PARTS; i++) {
+                manager.createEntityFromTemplate(GROUND_ENTITY).getComponent(TransformationComponent.class).translate(SCALE*4*i, 0, 0);
+            }
         }
 
         @Override
@@ -283,12 +304,47 @@ public class DukeGameClient extends ClientBase {
             manager.getEntitiesWith(GroundComponent.class, TransformationComponent.class).forEach(entity -> {
                 var transformation = entity.getComponent(TransformationComponent.class);
                 transformation.translate(deltaTime * MOVEMENT_SPEED, 0, 0);
-                if (transformation.getPosition().x < (-SCALE - 600)) transformation.translate(SCALE*4*3, 0, 0);
+                if (transformation.getPosition().x < (-SCALE - 600)) transformation.translate(SCALE*4*GROUND_PARTS, 0, 0);
             });
         }
     }
 
+    public static class UpdateBugPositionSystem extends System {
+
+        @Override
+        public void update(Manager manager, float deltaTime) {
+            manager.getEntitiesWith(BugComponent.class, TransformationComponent.class).forEach(entity -> {
+                var transformation = entity.getComponent(TransformationComponent.class);
+                transformation.translate(deltaTime * MOVEMENT_SPEED * BUG_SPEED_MULTIPLIER, 0, 0);
+                if (transformation.getPosition().x < (-600)) manager.freeEntity(entity);
+            });
+        }
+    }
+
+    public static class SpawnBugSystem extends System {
+
+        float duration = 0;
+
+        @Override
+        public void update(Manager manager, float deltaTime) {
+
+            // div by 10 so it doesn't duplicate as much
+            if (duration > BUG_FREQUENCY) {
+                manager.createEntityFromTemplate(BUG_ENTITY);
+                duration -= BUG_FREQUENCY;
+                Log.info("Spawned bug");
+            }
+
+            duration += deltaTime;
+        }
+    }
+
     public static class GroundComponent implements Component {
+        @Override
+        public void setDefaults() { }
+    }
+
+    public static class BugComponent implements Component {
         @Override
         public void setDefaults() { }
     }
