@@ -6,6 +6,7 @@ import com.terminalvelocitycabbage.engine.client.input.control.KeyboardKeyContro
 import com.terminalvelocitycabbage.engine.client.input.controller.BooleanController;
 import com.terminalvelocitycabbage.engine.client.input.types.ButtonAction;
 import com.terminalvelocitycabbage.engine.client.input.types.KeyboardInput;
+import com.terminalvelocitycabbage.engine.client.renderer.Font;
 import com.terminalvelocitycabbage.engine.client.renderer.RenderGraph;
 import com.terminalvelocitycabbage.engine.client.renderer.elements.VertexAttribute;
 import com.terminalvelocitycabbage.engine.client.renderer.elements.VertexFormat;
@@ -16,6 +17,7 @@ import com.terminalvelocitycabbage.engine.client.renderer.shader.Shader;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.ShaderProgramConfig;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.Uniform;
 import com.terminalvelocitycabbage.engine.client.scene.Scene;
+import com.terminalvelocitycabbage.engine.client.ui.UIRenderNode;
 import com.terminalvelocitycabbage.engine.client.window.WindowProperties;
 import com.terminalvelocitycabbage.engine.debug.Log;
 import com.terminalvelocitycabbage.engine.ecs.Component;
@@ -28,6 +30,7 @@ import com.terminalvelocitycabbage.engine.filesystem.sources.MainSource;
 import com.terminalvelocitycabbage.engine.graph.RenderNode;
 import com.terminalvelocitycabbage.engine.graph.Routine;
 import com.terminalvelocitycabbage.engine.registry.Identifier;
+import com.terminalvelocitycabbage.engine.state.State;
 import com.terminalvelocitycabbage.engine.util.HeterogeneousMap;
 import com.terminalvelocitycabbage.templates.ecs.components.*;
 import com.terminalvelocitycabbage.templates.events.*;
@@ -51,10 +54,12 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DEFAULT_FRAGMENT_SHADER;
     public static ShaderProgramConfig DEFAULT_SHADER_PROGRAM_CONFIG;
 
-    //Textures and atlases
+    //Atlases
+    public static Identifier TEXTURE_ATLAS;
+
+    //Textures
     public static Identifier DUKE_TEXTURE;
     public static Identifier GROUND_TEXTURE;
-    public static Identifier TEXTURE_ATLAS;
     public static Identifier BUG_TEXTURE;
     public static Identifier BACKGROUND_TEXTURE;
 
@@ -64,6 +69,10 @@ public class DukeGameClient extends ClientBase {
     public static Identifier GROUND_MODEL;
     public static Identifier BUG_MODEL;
     public static Identifier BACKGROUND_MODEL;
+
+    //Fonts
+    public static Identifier PIXEL_FONT_RESOURCE;
+    public static Identifier PIXEL_FONT;
 
     //Renderer configs
     public static final VertexFormat MESH_FORMAT = VertexFormat.builder()
@@ -80,6 +89,10 @@ public class DukeGameClient extends ClientBase {
     public static Identifier BUG_ENTITY;
     public static Identifier BACKGROUND_ENTITY;
     public static Identifier PLAYER_CAMERA_ENTITY;
+
+    //STATES
+    public static Identifier SCORE_STATE;
+    public static Identifier ALIVE_STATE;
 
     //Game Configuration
     public static float MOVEMENT_SPEED = -0.8f;
@@ -136,6 +149,14 @@ public class DukeGameClient extends ClientBase {
             BUG_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "bug.png").getIdentifier();
             BACKGROUND_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "background.png").getIdentifier();
         });
+        getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.FONT), e -> {
+            ResourceRegistrationEvent event = (ResourceRegistrationEvent) e;
+            PIXEL_FONT_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.FONT, "pixel_font.ttf").getIdentifier();
+        });
+        getEventDispatcher().listenToEvent(FontRegistrationEvent.EVENT, e -> {
+            FontRegistrationEvent event = (FontRegistrationEvent) e;
+            PIXEL_FONT = event.register(new Font(PIXEL_FONT_RESOURCE)).getIdentifier();
+        });
         getEventDispatcher().listenToEvent(ConfigureTexturesEvent.EVENT, e -> {
             ConfigureTexturesEvent event = (ConfigureTexturesEvent) e;
             //Register a default atlas
@@ -177,6 +198,7 @@ public class DukeGameClient extends ClientBase {
             event.createSystem(SpawnBugSystem.class);
             event.createSystem(UpdateBackgroundPositionsSystem.class);
             event.createSystem(CheckForCollisionSystem.class);
+            event.createSystem(CountPassedBugsSystem.class);
         });
         getEventDispatcher().listenToEvent(EntityTemplateRegistrationEvent.EVENT, e -> {
             EntityTemplateRegistrationEvent event = (EntityTemplateRegistrationEvent) e;
@@ -191,13 +213,13 @@ public class DukeGameClient extends ClientBase {
             });
             GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(GROUND_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(-150, GROUND_Y - 150, 0).setScale(SCALE*4f);
+                entity.addComponent(TransformationComponent.class).setPosition(-150, GROUND_Y - 150, -5).setScale(SCALE*4f);
                 entity.addComponent(GroundComponent.class);
             });
             BUG_ENTITY = event.createEntityTemplate(ID, "bug", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(BUG_MODEL);
                 entity.addComponent(BugComponent.class);
-                entity.addComponent(TransformationComponent.class).setPosition(BUG_START_POSITION_X, GROUND_Y, 0).setScale(SCALE);
+                entity.addComponent(TransformationComponent.class).setPosition(BUG_START_POSITION_X, GROUND_Y, 5).setScale(SCALE);
             });
             BACKGROUND_ENTITY = event.createEntityTemplate(ID, "background", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(BACKGROUND_MODEL);
@@ -215,6 +237,7 @@ public class DukeGameClient extends ClientBase {
                     .addStep(event.registerStep(ID, "spawn_bug"), SpawnBugSystem.class)
                     .addStep(event.registerStep(ID, "update_background_positions"), UpdateBackgroundPositionsSystem.class)
                     .addStep(event.registerStep(ID, "check_for_collision"), CheckForCollisionSystem.class)
+                    .addStep(event.registerStep(ID, "count_passed_bugs"), CountPassedBugsSystem.class)
                     .build());
         });
         getEventDispatcher().listenToEvent(RendererRegistrationEvent.EVENT, e -> {
@@ -223,6 +246,7 @@ public class DukeGameClient extends ClientBase {
                     new RenderGraph(RenderGraph.RenderPath.builder()
                             .addRoutineNode(DEFAULT_ROUTINE)
                             .addRenderNode(event.registerNode(ID, "draw_scene"), DrawSceneRenderNode.class, DEFAULT_SHADER_PROGRAM_CONFIG)
+                            .addRenderNode(event.registerNode(ID, "draw_ui"), DRAWUIRenderNode.class, ShaderProgramConfig.EMPTY)
                     )
             );
         });
@@ -240,6 +264,11 @@ public class DukeGameClient extends ClientBase {
             //Register Controllers
             inputHandler.registerController(ID, "exit_game", new CloseGameController(exitControl));
             inputHandler.registerController(ID, "jump", new JumpController(jumpControl));
+        });
+        getEventDispatcher().listenToEvent(GameStateRegistrationEvent.EVENT, e -> {
+            GameStateRegistrationEvent event = (GameStateRegistrationEvent) e;
+            SCORE_STATE = event.registerState(ID, "score", 0);
+            ALIVE_STATE = event.registerState(ID, "alive", true);
         });
     }
 
@@ -324,6 +353,9 @@ public class DukeGameClient extends ClientBase {
 
         @Override
         public void update(Manager manager, float deltaTime) {
+
+            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+
             manager.getEntitiesWith(GroundComponent.class, TransformationComponent.class).forEach(entity -> {
                 var transformation = entity.getComponent(TransformationComponent.class);
                 transformation.translate(deltaTime * MOVEMENT_SPEED, 0, 0);
@@ -336,9 +368,12 @@ public class DukeGameClient extends ClientBase {
 
         @Override
         public void update(Manager manager, float deltaTime) {
+
+            boolean alive = (boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue();
+
             manager.getEntitiesWith(BugComponent.class, TransformationComponent.class).forEach(entity -> {
                 var transformation = entity.getComponent(TransformationComponent.class);
-                transformation.translate(deltaTime * MOVEMENT_SPEED * BUG_SPEED_MULTIPLIER, 0, 0);
+                transformation.translate(deltaTime * MOVEMENT_SPEED * BUG_SPEED_MULTIPLIER * (alive ? 1 : 0.2f), 0, 0);
                 if (transformation.getPosition().x < (-600)) manager.freeEntity(entity);
             });
         }
@@ -348,9 +383,12 @@ public class DukeGameClient extends ClientBase {
 
         @Override
         public void update(Manager manager, float deltaTime) {
+
+            boolean alive = (boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue();
+
             manager.getEntitiesWith(BackgroundComponent.class, TransformationComponent.class).forEach(entity -> {
                 var transformation = entity.getComponent(TransformationComponent.class);
-                transformation.translate(deltaTime * MOVEMENT_SPEED * BACKGROUND_SPEED_MULTIPLIER, 0, 0);
+                transformation.translate(deltaTime * MOVEMENT_SPEED * BACKGROUND_SPEED_MULTIPLIER * (alive ? 1 : 0.1f), 0, 0);
                 if (transformation.getPosition().x < (-SCALE - 600)) transformation.translate(SCALE*8*BACKGROUND_PARTS, 0, 0);
             });
         }
@@ -371,7 +409,7 @@ public class DukeGameClient extends ClientBase {
                 var bugX = entityTransformation.getPosition().x;
                 var bugY = entityTransformation.getPosition().y;
                 if (intersects(playerX, playerY, bugX, bugY)) {
-                    MOVEMENT_SPEED = 0;
+                    DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).setValue(false);
                 }
             }
 
@@ -389,6 +427,8 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
 
+            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+
             // div by 10 so it doesn't duplicate as much
             if (duration > BUG_FREQUENCY) {
                 manager.createEntityFromTemplate(BUG_ENTITY);
@@ -399,19 +439,81 @@ public class DukeGameClient extends ClientBase {
         }
     }
 
+    public static class CountPassedBugsSystem extends System {
+
+        @Override
+        public void update(Manager manager, float deltaTime) {
+
+            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+
+            manager.getEntitiesWith(BugComponent.class, TransformationComponent.class).forEach(entity -> {
+                if (entity.getComponent(TransformationComponent.class).getPosition().x < (PLAYER_POSITION_X) - INTERSECTION_RADIUS) {
+                    if (!entity.getComponent(BugComponent.class).isPassed()) {
+                        State<Integer> state = DukeGameClient.getInstance().getStateHandler().getState(SCORE_STATE);
+                        state.setValue(state.getValue() + 1);
+                    }
+                    entity.getComponent(BugComponent.class).pass();
+                }
+            });
+        }
+    }
+
     public static class GroundComponent implements Component {
         @Override
         public void setDefaults() { }
     }
 
     public static class BugComponent implements Component {
+
+        boolean passed = false;
+
         @Override
-        public void setDefaults() { }
+        public void setDefaults() {
+            passed = false;
+        }
+
+        public boolean isPassed() {
+            return passed;
+        }
+
+        public void pass() {
+            passed = true;
+        }
     }
 
     public static class BackgroundComponent implements Component {
         @Override
         public void setDefaults() { }
+    }
+
+    public static class DRAWUIRenderNode extends UIRenderNode {
+
+        public DRAWUIRenderNode(ShaderProgramConfig shaderProgramConfig) {
+            super(shaderProgramConfig);
+        }
+
+        @Override
+        protected Identifier[] getInterestedEvents() {
+            return new Identifier[] {};
+        }
+
+        @Override
+        protected void declareUI() {
+
+            boolean alive = (boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue();
+
+            if (alive) {
+                container("float-root z-[10] align-x-[center] align-y-[center] w-[100] h-[30] attach-[top] to-[top] float-offset-y-[30] p-[10]", () -> {
+                    text(DukeGameClient.getInstance().getStateHandler().getState(SCORE_STATE).getValue().toString(),
+                            "text-size-[40] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                });
+            } else {
+                container("border-width-[6] border-color-[0,0,0,1] float-root z-[10] align-x-[center] align-y-[center] w-[360] h-[140] bg-[1,1,1,1] attach-[center] to-[center] p-[10] float-offset-y-[-90]", () -> {
+                    text("You Died with a score of: " + DukeGameClient.getInstance().getStateHandler().getState(SCORE_STATE).getValue().toString(),
+                            "text-size-[20] text-color-[1,0,0,1] font-[" + PIXEL_FONT + "]");
+                });
+            }
+        }
     }
 
     public static class DrawSceneRenderNode extends RenderNode {
@@ -452,10 +554,8 @@ public class DukeGameClient extends ClientBase {
                 if (mesh.getFormat().equals(shaderProgram.getConfig().getVertexFormat())) mesh.render();
             }
 
+            glClearColor(0f, 0f, 1f, 1.0f);
             shaderProgram.unbind();
-
-            //TODO remove this because we don't really need it, just don't have a background yet
-            glClearColor(.6f, 0.6f, 0.6f, 1.0f);
         }
     }
 
@@ -479,6 +579,9 @@ public class DukeGameClient extends ClientBase {
 
         @Override
         public void act() {
+
+            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+
             if (isEnabled()) {
                 var manager = ClientBase.getInstance().getManager();
                 manager.getEntitiesWith(TransformationComponent.class, VelocityComponent.class).forEach(entity -> {
