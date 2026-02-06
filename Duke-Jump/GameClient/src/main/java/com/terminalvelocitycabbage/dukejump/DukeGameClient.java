@@ -55,12 +55,14 @@ public class DukeGameClient extends ClientBase {
     public static Identifier GROUND_TEXTURE;
     public static Identifier TEXTURE_ATLAS;
     public static Identifier BUG_TEXTURE;
+    public static Identifier BACKGROUND_TEXTURE;
 
     //Meshes and Models
     public static Identifier SPRITE_MESH;
     public static Identifier DUKE_MODEL;
     public static Identifier GROUND_MODEL;
     public static Identifier BUG_MODEL;
+    public static Identifier BACKGROUND_MODEL;
 
     //Renderer configs
     public static final VertexFormat MESH_FORMAT = VertexFormat.builder()
@@ -75,6 +77,7 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DUKE_ENTITY;
     public static Identifier GROUND_ENTITY;
     public static Identifier BUG_ENTITY;
+    public static Identifier BACKGROUND_ENTITY;
     public static Identifier PLAYER_CAMERA_ENTITY;
 
     //Game Configuration
@@ -88,6 +91,8 @@ public class DukeGameClient extends ClientBase {
     public static final int BUG_START_POSITION_X = 500;
     public static final float BUG_SPEED_MULTIPLIER = 1.2f;
     public static final int BUG_FREQUENCY = 1000; //duration in ms between bug spawns
+    public static final float BACKGROUND_SPEED_MULTIPLIER = 0.2f;
+    public static final int BACKGROUND_PARTS = 5;
 
     public DukeGameClient(String namespace, int ticksPerSecond) {
         super(namespace, ticksPerSecond);
@@ -122,10 +127,12 @@ public class DukeGameClient extends ClientBase {
                     .build();
         });
         getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.TEXTURE), e -> {
+            ResourceRegistrationEvent event = (ResourceRegistrationEvent) e;
             //Register texture resources
-            DUKE_TEXTURE = ((ResourceRegistrationEvent) e).registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke.png").getIdentifier();
-            GROUND_TEXTURE = ((ResourceRegistrationEvent) e).registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "ground.png").getIdentifier();
-            BUG_TEXTURE = ((ResourceRegistrationEvent) e).registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "bug.png").getIdentifier();
+            DUKE_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke.png").getIdentifier();
+            GROUND_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "ground.png").getIdentifier();
+            BUG_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "bug.png").getIdentifier();
+            BACKGROUND_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "background.png").getIdentifier();
         });
         getEventDispatcher().listenToEvent(ConfigureTexturesEvent.EVENT, e -> {
             ConfigureTexturesEvent event = (ConfigureTexturesEvent) e;
@@ -135,6 +142,7 @@ public class DukeGameClient extends ClientBase {
             event.addTexture(GROUND_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(BUG_TEXTURE, TEXTURE_ATLAS);
+            event.addTexture(BACKGROUND_TEXTURE, TEXTURE_ATLAS);
         });
         getEventDispatcher().listenToEvent(MeshRegistrationEvent.EVENT, e -> {
             MeshRegistrationEvent event = (MeshRegistrationEvent) e;
@@ -145,6 +153,7 @@ public class DukeGameClient extends ClientBase {
             DUKE_MODEL = event.registerModel(ID, "duke", SPRITE_MESH, DUKE_TEXTURE);
             GROUND_MODEL = event.registerModel(ID, "ground", SPRITE_MESH, GROUND_TEXTURE);
             BUG_MODEL = event.registerModel(ID, "bug", SPRITE_MESH, BUG_TEXTURE);
+            BACKGROUND_MODEL = event.registerModel(ID, "background", SPRITE_MESH, BACKGROUND_TEXTURE);
         });
         getEventDispatcher().listenToEvent(EntityComponentRegistrationEvent.EVENT, e -> {
             EntityComponentRegistrationEvent event = (EntityComponentRegistrationEvent) e;
@@ -155,6 +164,7 @@ public class DukeGameClient extends ClientBase {
             event.registerComponent(VelocityComponent.class);
             event.registerComponent(GroundComponent.class);
             event.registerComponent(BugComponent.class);
+            event.registerComponent(BackgroundComponent.class);
         });
         getEventDispatcher().listenToEvent(EntitySystemRegistrationEvent.EVENT, e -> {
             EntitySystemRegistrationEvent event = (EntitySystemRegistrationEvent) e;
@@ -163,6 +173,7 @@ public class DukeGameClient extends ClientBase {
             event.createSystem(UpdateGroundPositionsSystem.class);
             event.createSystem(UpdateBugPositionSystem.class);
             event.createSystem(SpawnBugSystem.class);
+            event.createSystem(UpdateBackgroundPositionsSystem.class);
         });
         getEventDispatcher().listenToEvent(EntityTemplateRegistrationEvent.EVENT, e -> {
             EntityTemplateRegistrationEvent event = (EntityTemplateRegistrationEvent) e;
@@ -177,13 +188,18 @@ public class DukeGameClient extends ClientBase {
             });
             GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(GROUND_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(0, GROUND_Y - 150, 0).setScale(SCALE*4f);
+                entity.addComponent(TransformationComponent.class).setPosition(-150, GROUND_Y - 150, 0).setScale(SCALE*4f);
                 entity.addComponent(GroundComponent.class);
             });
             BUG_ENTITY = event.createEntityTemplate(ID, "bug", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(BUG_MODEL);
                 entity.addComponent(BugComponent.class);
                 entity.addComponent(TransformationComponent.class).setPosition(BUG_START_POSITION_X, GROUND_Y, 0).setScale(SCALE);
+            });
+            BACKGROUND_ENTITY = event.createEntityTemplate(ID, "background", entity -> {
+                entity.addComponent(ModelComponent.class).setModel(BACKGROUND_MODEL);
+                entity.addComponent(TransformationComponent.class).setPosition(-300, 80, -10).setScale(SCALE*8f);
+                entity.addComponent(BackgroundComponent.class);
             });
         });
         getEventDispatcher().listenToEvent(RoutineRegistrationEvent.EVENT, e -> {
@@ -194,8 +210,8 @@ public class DukeGameClient extends ClientBase {
                     .addStep(event.registerStep(ID, "update_ground_positions"), UpdateGroundPositionsSystem.class)
                     .addStep(event.registerStep(ID, "update_bug_positions"), UpdateBugPositionSystem.class)
                     .addStep(event.registerStep(ID, "spawn_bug"), SpawnBugSystem.class)
+                    .addStep(event.registerStep(ID, "update_background_positions"), UpdateBackgroundPositionsSystem.class)
                     .build());
-            Log.info(DEFAULT_ROUTINE);
         });
         getEventDispatcher().listenToEvent(RendererRegistrationEvent.EVENT, e -> {
             RendererRegistrationEvent event = (RendererRegistrationEvent) e;
@@ -254,6 +270,9 @@ public class DukeGameClient extends ClientBase {
             client.getTextureCache().generateAtlas(TEXTURE_ATLAS);
             setMeshCache(new MeshCache(client.getModelRegistry(), client.getMeshRegistry(), client.getTextureCache()));
 
+            for (int i = 0; i < BACKGROUND_PARTS; i++) {
+                manager.createEntityFromTemplate(BACKGROUND_ENTITY).getComponent(TransformationComponent.class).translate(SCALE*8*i, 0, 0);
+            }
             manager.createEntityFromTemplate(DUKE_ENTITY);
             manager.createEntityFromTemplate(PLAYER_CAMERA_ENTITY);
             for (int i = 0; i < GROUND_PARTS; i++) {
@@ -321,6 +340,18 @@ public class DukeGameClient extends ClientBase {
         }
     }
 
+    public static class UpdateBackgroundPositionsSystem extends System {
+
+        @Override
+        public void update(Manager manager, float deltaTime) {
+            manager.getEntitiesWith(BackgroundComponent.class, TransformationComponent.class).forEach(entity -> {
+                var transformation = entity.getComponent(TransformationComponent.class);
+                transformation.translate(deltaTime * MOVEMENT_SPEED * BACKGROUND_SPEED_MULTIPLIER, 0, 0);
+                if (transformation.getPosition().x < (-SCALE - 600)) transformation.translate(SCALE*8*BACKGROUND_PARTS, 0, 0);
+            });
+        }
+    }
+
     public static class SpawnBugSystem extends System {
 
         float duration = 0;
@@ -332,7 +363,6 @@ public class DukeGameClient extends ClientBase {
             if (duration > BUG_FREQUENCY) {
                 manager.createEntityFromTemplate(BUG_ENTITY);
                 duration -= BUG_FREQUENCY;
-                Log.info("Spawned bug");
             }
 
             duration += deltaTime;
@@ -345,6 +375,11 @@ public class DukeGameClient extends ClientBase {
     }
 
     public static class BugComponent implements Component {
+        @Override
+        public void setDefaults() { }
+    }
+
+    public static class BackgroundComponent implements Component {
         @Override
         public void setDefaults() { }
     }
@@ -390,7 +425,7 @@ public class DukeGameClient extends ClientBase {
             shaderProgram.unbind();
 
             //TODO remove this because we don't really need it, just don't have a background yet
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClearColor(.6f, 0.6f, 0.6f, 1.0f);
         }
     }
 
