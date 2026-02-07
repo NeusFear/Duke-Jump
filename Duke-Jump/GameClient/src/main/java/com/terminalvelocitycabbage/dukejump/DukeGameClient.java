@@ -12,14 +12,12 @@ import com.terminalvelocitycabbage.engine.client.renderer.elements.VertexAttribu
 import com.terminalvelocitycabbage.engine.client.renderer.elements.VertexFormat;
 import com.terminalvelocitycabbage.engine.client.renderer.model.Mesh;
 import com.terminalvelocitycabbage.engine.client.renderer.model.MeshCache;
-import com.terminalvelocitycabbage.engine.client.renderer.model.Model;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.Shader;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.ShaderProgramConfig;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.Uniform;
 import com.terminalvelocitycabbage.engine.client.scene.Scene;
 import com.terminalvelocitycabbage.engine.client.ui.UIRenderNode;
 import com.terminalvelocitycabbage.engine.client.window.WindowProperties;
-import com.terminalvelocitycabbage.engine.debug.Log;
 import com.terminalvelocitycabbage.engine.ecs.Component;
 import com.terminalvelocitycabbage.engine.ecs.Entity;
 import com.terminalvelocitycabbage.engine.ecs.Manager;
@@ -111,6 +109,7 @@ public class DukeGameClient extends ClientBase {
     public static final int BUG_START_POSITION_X = 500;
     public static final float BUG_SPEED_MULTIPLIER = 1.2f;
     public static final int BUG_FREQUENCY = 1000; //duration in ms between bug spawns
+    public static final int BUG_FREQUENCY_VARIANCE = 600;
     public static final float BACKGROUND_SPEED_MULTIPLIER = 0.2f;
     public static final int BACKGROUND_PARTS = 5;
     public static final float INTERSECTION_RADIUS = SCALE / 2f;
@@ -419,6 +418,8 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
 
+            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+
             var player = manager.getFirstEntityWith(VelocityComponent.class, TransformationComponent.class);
             var transformation = player.getComponent(TransformationComponent.class);
             var playerX = transformation.getPosition().x;
@@ -444,16 +445,17 @@ public class DukeGameClient extends ClientBase {
     public static class SpawnBugSystem extends System {
 
         float duration = 0;
+        int variation = 0;
 
         @Override
         public void update(Manager manager, float deltaTime) {
 
             if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
 
-            // div by 10 so it doesn't duplicate as much
-            if (duration > BUG_FREQUENCY) {
+            if (duration > (BUG_FREQUENCY + variation)) {
                 manager.createEntityFromTemplate(BUG_ENTITY);
                 duration -= BUG_FREQUENCY;
+                variation = (int) (Math.random() * BUG_FREQUENCY_VARIANCE);
             }
 
             duration += deltaTime;
