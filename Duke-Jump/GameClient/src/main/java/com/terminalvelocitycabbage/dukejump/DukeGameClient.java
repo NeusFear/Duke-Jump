@@ -3,9 +3,13 @@ package com.terminalvelocitycabbage.dukejump;
 import com.terminalvelocitycabbage.engine.client.ClientBase;
 import com.terminalvelocitycabbage.engine.client.input.control.Control;
 import com.terminalvelocitycabbage.engine.client.input.control.KeyboardKeyControl;
+import com.terminalvelocitycabbage.engine.client.input.control.MouseButtonControl;
+import com.terminalvelocitycabbage.engine.client.input.control.MouseScrollControl;
 import com.terminalvelocitycabbage.engine.client.input.controller.BooleanController;
+import com.terminalvelocitycabbage.engine.client.input.controller.ControlGroup;
 import com.terminalvelocitycabbage.engine.client.input.types.ButtonAction;
 import com.terminalvelocitycabbage.engine.client.input.types.KeyboardInput;
+import com.terminalvelocitycabbage.engine.client.input.types.MouseInput;
 import com.terminalvelocitycabbage.engine.client.renderer.Font;
 import com.terminalvelocitycabbage.engine.client.renderer.RenderGraph;
 import com.terminalvelocitycabbage.engine.client.renderer.elements.VertexAttribute;
@@ -18,6 +22,7 @@ import com.terminalvelocitycabbage.engine.client.renderer.shader.Uniform;
 import com.terminalvelocitycabbage.engine.client.scene.Scene;
 import com.terminalvelocitycabbage.engine.client.ui.UIRenderNode;
 import com.terminalvelocitycabbage.engine.client.window.WindowProperties;
+import com.terminalvelocitycabbage.engine.debug.Log;
 import com.terminalvelocitycabbage.engine.ecs.Component;
 import com.terminalvelocitycabbage.engine.ecs.Entity;
 import com.terminalvelocitycabbage.engine.ecs.Manager;
@@ -32,9 +37,13 @@ import com.terminalvelocitycabbage.engine.state.State;
 import com.terminalvelocitycabbage.engine.util.HeterogeneousMap;
 import com.terminalvelocitycabbage.templates.ecs.components.*;
 import com.terminalvelocitycabbage.templates.events.*;
+import com.terminalvelocitycabbage.templates.inputcontrollers.UIClickController;
+import com.terminalvelocitycabbage.templates.inputcontrollers.UIScrollController;
 import com.terminalvelocitycabbage.templates.meshes.SquareDataMesh;
 import org.joml.Vector2f;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.lwjgl.opengl.GL11C.glClearColor;
@@ -95,8 +104,8 @@ public class DukeGameClient extends ClientBase {
     public static Identifier PLAYER_CAMERA_ENTITY;
 
     //STATES
-    public static Identifier SCORE_STATE;
-    public static Identifier ALIVE_STATE;
+    public static Identifier CURRENT_SCORE;
+    public static Identifier GAME_STATE;
 
     //Game Configuration
     public static float MOVEMENT_SPEED = -0.8f;
@@ -105,7 +114,7 @@ public class DukeGameClient extends ClientBase {
     public static final float SCALE = 60f;
     public static final int GROUND_PARTS = 8;
     public static final int GROUND_Y = -100;
-    public static final int PLAYER_POSITION_X = -200;
+    public static final int PLAYER_POSITION_X = -300;
     public static final int BUG_START_POSITION_X = 500;
     public static final float BUG_SPEED_MULTIPLIER = 1.2f;
     public static final int BUG_FREQUENCY = 1000; //duration in ms between bug spawns
@@ -114,8 +123,12 @@ public class DukeGameClient extends ClientBase {
     public static final int BACKGROUND_PARTS = 5;
     public static final float INTERSECTION_RADIUS = SCALE / 2f;
 
+    //High Scores
+    public static final List<Score> HIGH_SCORES = new ArrayList<>();
+
     public DukeGameClient(String namespace, int ticksPerSecond) {
         super(namespace, ticksPerSecond);
+        Collections.sort(HIGH_SCORES);
         //Listen to events
         getEventDispatcher().listenToEvent(ResourceCategoryRegistrationEvent.EVENT, e -> {
             //Register engine defaults
@@ -232,7 +245,7 @@ public class DukeGameClient extends ClientBase {
             });
             GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(GROUND_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(-150, GROUND_Y - 150, -5).setScale(SCALE*4f);
+                entity.addComponent(TransformationComponent.class).setPosition(-300, GROUND_Y - 150, -5).setScale(SCALE*4f);
                 entity.addComponent(GroundComponent.class);
             });
             BUG_ENTITY = event.createEntityTemplate(ID, "bug", entity -> {
@@ -242,7 +255,7 @@ public class DukeGameClient extends ClientBase {
             });
             BACKGROUND_ENTITY = event.createEntityTemplate(ID, "background", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(BACKGROUND_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(-300, 80, -10).setScale(SCALE*8f);
+                entity.addComponent(TransformationComponent.class).setPosition(-300, 80, -10).setScale((SCALE+1)*8f);
                 entity.addComponent(BackgroundComponent.class);
             });
         });
@@ -280,14 +293,22 @@ public class DukeGameClient extends ClientBase {
             //Register Controls
             Control exitControl = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.ESCAPE));
             Control jumpControl = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.SPACE));
+            Control leftClickControl = inputHandler.registerControlListener(new MouseButtonControl(MouseInput.Button.LEFT_CLICK));
+            Control mouseScrollUpControl = inputHandler.registerControlListener(new MouseScrollControl(MouseInput.ScrollDirection.UP, 1f));
+            Control mouseScrollDownControl = inputHandler.registerControlListener(new MouseScrollControl(MouseInput.ScrollDirection.DOWN, 1f));
             //Register Controllers
             inputHandler.registerController(ID, "exit_game", new CloseGameController(exitControl));
             inputHandler.registerController(ID, "jump", new JumpController(jumpControl));
+            inputHandler.registerController(ID, "ui_click", new UIClickController(MouseInput.Button.LEFT_CLICK, leftClickControl));
+            inputHandler.registerController(ID, "scroll", new UIScrollController(
+                    new ControlGroup(mouseScrollUpControl),
+                    new ControlGroup(mouseScrollDownControl)
+            ));
         });
         getEventDispatcher().listenToEvent(GameStateRegistrationEvent.EVENT, e -> {
             GameStateRegistrationEvent event = (GameStateRegistrationEvent) e;
-            SCORE_STATE = event.registerState(ID, "score", 0);
-            ALIVE_STATE = event.registerState(ID, "alive", true);
+            CURRENT_SCORE = event.registerState(ID, "score", 0);
+            GAME_STATE = event.registerState(ID, "alive", GameState.MAIN_MENU);
         });
     }
 
@@ -373,7 +394,7 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
 
-            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+            if (!(boolean) isAlive()) return;
 
             manager.getEntitiesWith(GroundComponent.class, TransformationComponent.class).forEach(entity -> {
                 var transformation = entity.getComponent(TransformationComponent.class);
@@ -388,7 +409,7 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
 
-            boolean alive = (boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue();
+            boolean alive = isAlive();
 
             manager.getEntitiesWith(BugComponent.class, TransformationComponent.class).forEach(entity -> {
                 var transformation = entity.getComponent(TransformationComponent.class);
@@ -403,7 +424,7 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
 
-            boolean alive = (boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue();
+            boolean alive = isAlive();
 
             manager.getEntitiesWith(BackgroundComponent.class, TransformationComponent.class).forEach(entity -> {
                 var transformation = entity.getComponent(TransformationComponent.class);
@@ -418,7 +439,7 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
 
-            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+            if (!(boolean) isAlive()) return;
 
             var player = manager.getFirstEntityWith(VelocityComponent.class, TransformationComponent.class);
             var transformation = player.getComponent(TransformationComponent.class);
@@ -430,7 +451,7 @@ public class DukeGameClient extends ClientBase {
                 var bugX = entityTransformation.getPosition().x;
                 var bugY = entityTransformation.getPosition().y;
                 if (intersects(playerX, playerY, bugX, bugY)) {
-                    DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).setValue(false);
+                    DukeGameClient.getInstance().getStateHandler().getState(GAME_STATE).setValue(GameState.DEAD);
                     player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_DEATH);
                 }
             }
@@ -450,7 +471,7 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
 
-            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+            if (!(boolean) isAlive()) return;
 
             if (duration > (BUG_FREQUENCY + variation)) {
                 manager.createEntityFromTemplate(BUG_ENTITY);
@@ -467,12 +488,12 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
 
-            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+            if (!(boolean) isAlive()) return;
 
             manager.getEntitiesWith(BugComponent.class, TransformationComponent.class).forEach(entity -> {
                 if (entity.getComponent(TransformationComponent.class).getPosition().x < (PLAYER_POSITION_X) - INTERSECTION_RADIUS) {
                     if (!entity.getComponent(BugComponent.class).isPassed()) {
-                        State<Integer> state = DukeGameClient.getInstance().getStateHandler().getState(SCORE_STATE);
+                        State<Integer> state = DukeGameClient.getInstance().getStateHandler().getState(CURRENT_SCORE);
                         state.setValue(state.getValue() + 1);
                     }
                     entity.getComponent(BugComponent.class).pass();
@@ -517,25 +538,176 @@ public class DukeGameClient extends ClientBase {
 
         @Override
         protected Identifier[] getInterestedEvents() {
-            return new Identifier[] {};
+            return new Identifier[] { UIClickEvent.EVENT, UIScrollEvent.EVENT, UICharInputEvent.EVENT };
         }
 
         @Override
         protected void declareUI() {
 
-            boolean alive = (boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue();
+            GameState state = (GameState) DukeGameClient.getInstance().getStateHandler().getState(GAME_STATE).getValue();
+            boolean alive = isAlive();
+            boolean paused = state.equals(GameState.PAUSED);
+            boolean dead = state.equals(GameState.DEAD);
+            boolean mainMenu = state.equals(GameState.MAIN_MENU);
 
-            if (alive) {
-                container("float-root z-[10] align-x-[center] align-y-[center] w-[100] h-[30] attach-[top] to-[top] float-offset-y-[30] p-[10]", () -> {
-                    text(DukeGameClient.getInstance().getStateHandler().getState(SCORE_STATE).getValue().toString(),
-                            "text-size-[40] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+            if (!alive) {
+                var currentScore = DukeGameClient.getInstance().getStateHandler().getState(CURRENT_SCORE).getValue();
+                container("grow-y grow-x px-[140] py-[30]", () -> {
+                    container("grow-x grow-y layout-y-[ttb]", () -> {
+                        titleText();
+                        if (dead) {
+                            container("layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]", () -> {
+                                container("layout-y-[ttb] p-[10] grow-x align-x-[center]", () -> {
+                                    text("YOU DIED.", "grow-x text-size-[60] text-color-[1,0,0,1] font-[" + PIXEL_FONT + "]");
+                                });
+                                container("layout-y-[ttb] pb-[2] grow-x align-x-[center]", () -> {
+                                    text("Score: " + currentScore, "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                                });
+                                container("layout-y-[ttb] grow-x p-[10] gap-[5]", () -> {
+                                    nameInput();
+                                });
+                                mainMenuButton();
+                            });
+                        }
+                        if (mainMenu) {
+                            highScores();
+                        }
+                        if (paused) {
+                            //TODO
+                            container("layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]", () -> {
+                                text("PAUSED", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                            });
+                        }
+                        container("grow-x h-[80] py-[10] gap-[10]", () -> {
+                            if (!dead) {
+                                playButton();
+                                quitButton();
+                            }
+                        });
+                    });
                 });
             } else {
-                container("border-width-[6] border-color-[0,0,0,1] float-root z-[10] align-x-[center] align-y-[center] w-[360] h-[140] bg-[1,1,1,1] attach-[center] to-[center] p-[10] float-offset-y-[-90]", () -> {
-                    text("You Died with a score of: " + DukeGameClient.getInstance().getStateHandler().getState(SCORE_STATE).getValue().toString(),
-                            "text-size-[20] text-color-[1,0,0,1] font-[" + PIXEL_FONT + "]");
+                container("float-root z-[10] align-x-[center] align-y-[center] w-[100] h-[30] attach-[top] to-[top] float-offset-y-[30] p-[10]", () -> {
+                    text(DukeGameClient.getInstance().getStateHandler().getState(CURRENT_SCORE).getValue().toString(),
+                            "text-size-[40] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
                 });
             }
+        }
+
+        private void titleText() {
+            container("grow-x px-[40] py-[5] align-x-[center]", () -> {
+                text("DUKE JUMP", "text-size-[40] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+            });
+        }
+
+        private void mainMenuButton() {
+
+            int buttonID = id("mainMenuButton");
+
+            container(buttonID, "grow-x mt-[10] h-[40px] p-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+                text("RETURN TO MAIN MENU", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+            });
+
+            if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+                DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
+                DukeGameClient.getInstance().getStateHandler().updateState(GAME_STATE, GameState.MAIN_MENU);
+                DukeGameClient.getInstance().getStateHandler().getState(CURRENT_SCORE).setValue(0);
+            }
+        }
+
+        private void nameInput() {
+
+            int inputId = id("nameInput");
+            int buttonID = id("submitNameButton");
+            var textState = useState(inputId + "_text", "");
+
+            container("grow-x layout-y-[ttb] gap-5", () -> {
+                text("Save High Score:", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                input(inputId, "bg-[1,1,1,1] grow-x h-[40px] p-[5] layout-x-[rtr] align-y-[center] gap-[2] border-color-[0,0,0,1] border-width-[3] clip",
+                        "bg-[1,0,0,1] w-[2px] h-[20px]",
+                        "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]"
+                );
+
+                container(buttonID, "grow-x mt-[10] h-[40px] py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+                    text("SUBMIT", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                });
+            });
+
+            if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+                HIGH_SCORES.add(new Score(textState.getValue(), (Integer) getInstance().getStateHandler().getState(CURRENT_SCORE).getValue()));
+                Collections.sort(HIGH_SCORES);
+                DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
+                DukeGameClient.getInstance().getStateHandler().updateState(GAME_STATE, GameState.MAIN_MENU);
+                DukeGameClient.getInstance().getStateHandler().getState(CURRENT_SCORE).setValue(0);
+            }
+        }
+
+        private void listItem(String first, String middle, String last, boolean compared) {
+            container("grow-x layout-x-[ltr] gap-[5] bg-[.9,.9,.9,1] p-[4]" + (compared ? "px-[30]" : ""), () -> {
+                container("bg-[1,1,1,1] p-[4]", () -> text(first, "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]"));
+                text(middle, "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                container("grow-x", () -> { });
+                text(last, "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+            });
+        }
+
+        private void highScores() {
+            container("grow-x px-[40] py-[5] align-x-[center]", () -> {
+                text("High Scores", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+            });
+            container("grow-x layout-x-[ltr] gap-[5] px-[8] pt-[10] bg-[1,1,1,1]", () -> {
+                text("Place", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                container("grow-x", () -> { });
+                text("Player", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                container("grow-x", () -> { });
+                text("Score", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+            });
+            scrollableContainer(
+                    "bg-[1,16,1,1] layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]",
+                    "bg-[1,0,0,1] w-[10px] fit-y", () -> {
+                        if (HIGH_SCORES.isEmpty()) {
+                            container("grow layout-x-[ltr] gap-[5] bg-[.9,.9,.9,1] p-[4]", () -> {
+                                container("grow", () -> { });
+                                text("No High Scores Recorded", "text-size-[20] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+                                container("grow", () -> { });
+                            });
+                        }
+                        for (int i = 0; i < HIGH_SCORES.size(); i++) {
+                            Score score = HIGH_SCORES.get(i);
+                            listItem(String.valueOf(i + 1), score.scoreHolder, String.valueOf(score.score), false);
+                        }
+                        container("h-[20]", () -> {});
+                    });
+        }
+
+        private void playButton() {
+
+            int buttonID = id("playButton");
+
+            if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+                DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
+                DukeGameClient.getInstance().getStateHandler().updateState(GAME_STATE, GameState.GAME_RUNNING);
+                DukeGameClient.getInstance().getStateHandler().getState(CURRENT_SCORE).setValue(0);
+                Log.info("Play button clicked");
+            }
+
+            container(buttonID, "grow py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+                text("PLAY", "text-size-[40] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+            });
+        }
+
+        private void quitButton() {
+
+            int buttonID = id("quitButton");
+
+            if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+                DukeGameClient.getInstance().getWindowManager().closeFocusedWindow();
+                Log.info("Quit button clicked, closing focused window");
+            }
+
+            container(buttonID, "grow py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+                text("QUIT", "text-size-[40] text-color-[0,0,0,1] font-[" + PIXEL_FONT + "]");
+            });
         }
     }
 
@@ -604,7 +776,7 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void act() {
 
-            if (!(boolean) DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).getValue()) return;
+            if (!isAlive()) return;
 
             if (isEnabled()) {
                 var manager = ClientBase.getInstance().getManager();
@@ -614,6 +786,25 @@ public class DukeGameClient extends ClientBase {
                     player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_JUMP);
                 }
             }
+        }
+    }
+    
+    public enum GameState {
+        MAIN_MENU,
+        GAME_RUNNING,
+        PAUSED,
+        DEAD
+    }
+
+    public static boolean isAlive() {
+        return DukeGameClient.getInstance().getStateHandler().getState(GAME_STATE).getValue().equals(GameState.GAME_RUNNING);
+    }
+
+    public static record Score(String scoreHolder, int score) implements Comparable<Score> {
+
+        @Override
+        public int compareTo(Score o) {
+            return Integer.compare(o.score, score);
         }
     }
 }
