@@ -82,6 +82,8 @@ public class DukeGameClient extends ClientBase {
     public static Identifier SOUND_JUMP;
     public static Identifier SOUND_DEATH_RESOURCE;
     public static Identifier SOUND_DEATH;
+    public static Identifier SOUND_SQUASH_RESOURCE;
+    public static Identifier SOUND_SQUASH;
 
     //Fonts
     public static Identifier PIXEL_FONT_RESOURCE;
@@ -108,9 +110,10 @@ public class DukeGameClient extends ClientBase {
     public static Identifier GAME_STATE;
 
     //Game Configuration
-    public static float MOVEMENT_SPEED = -0.8f;
+    public static float MOVEMENT_SPEED = -0.5f;
     public static final float GRAVITY = 0.005f;
     public static final float JUMP_FORCE = 1.25f;
+    public static final float SQUASH_UPFORCE = 0.75f;
     public static final float SCALE = 60f;
     public static final int GROUND_PARTS = 8;
     public static final int GROUND_Y = -100;
@@ -122,6 +125,7 @@ public class DukeGameClient extends ClientBase {
     public static final float BACKGROUND_SPEED_MULTIPLIER = 0.2f;
     public static final int BACKGROUND_PARTS = 5;
     public static final float INTERSECTION_RADIUS = SCALE / 2f;
+    public static final float SQUASH_OFFSET = INTERSECTION_RADIUS * 0.5f;
 
     //High Scores
     public static final List<Score> HIGH_SCORES = new ArrayList<>();
@@ -171,11 +175,13 @@ public class DukeGameClient extends ClientBase {
             ResourceRegistrationEvent event = (ResourceRegistrationEvent) e;
             SOUND_JUMP_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "jump.ogg").getIdentifier();
             SOUND_DEATH_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "death.ogg").getIdentifier();
+            SOUND_SQUASH_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "squash.ogg").getIdentifier();
         });
         getEventDispatcher().listenToEvent(SoundRegistrationEvent.EVENT, e -> {
             SoundRegistrationEvent event = (SoundRegistrationEvent) e;
             SOUND_JUMP = event.registerSound(SOUND_JUMP_RESOURCE);
             SOUND_DEATH = event.registerSound(SOUND_DEATH_RESOURCE);
+            SOUND_SQUASH = event.registerSound(SOUND_SQUASH_RESOURCE);
         });
         getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.FONT), e -> {
             ResourceRegistrationEvent event = (ResourceRegistrationEvent) e;
@@ -218,6 +224,8 @@ public class DukeGameClient extends ClientBase {
             event.registerComponent(BackgroundComponent.class);
             event.registerComponent(SoundSourceComponent.class);
             event.registerComponent(SoundListenerComponent.class);
+            event.registerComponent(SquashedComponent.class);
+            event.registerComponent(PlayerComponent.class);
         });
         getEventDispatcher().listenToEvent(EntitySystemRegistrationEvent.EVENT, e -> {
             EntitySystemRegistrationEvent event = (EntitySystemRegistrationEvent) e;
@@ -238,6 +246,7 @@ public class DukeGameClient extends ClientBase {
                 entity.addComponent(VelocityComponent.class);
                 entity.addComponent(SoundSourceComponent.class);
                 entity.addComponent(SoundListenerComponent.class);
+                entity.addComponent(PlayerComponent.class);
             });
             PLAYER_CAMERA_ENTITY = event.createEntityTemplate(ID, "player_camera", entity -> {
                 entity.addComponent(TransformationComponent.class).setPosition(0, 0, -100);
@@ -252,6 +261,7 @@ public class DukeGameClient extends ClientBase {
                 entity.addComponent(ModelComponent.class).setModel(BUG_MODEL);
                 entity.addComponent(BugComponent.class);
                 entity.addComponent(TransformationComponent.class).setPosition(BUG_START_POSITION_X, GROUND_Y, 5).setScale(SCALE);
+                entity.addComponent(SoundSourceComponent.class);
             });
             BACKGROUND_ENTITY = event.createEntityTemplate(ID, "background", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(BACKGROUND_MODEL);
@@ -366,7 +376,7 @@ public class DukeGameClient extends ClientBase {
         @Override
         public void update(Manager manager, float deltaTime) {
             manager.getEntitiesWith(VelocityComponent.class).forEach(entity -> {
-                if (entity.getComponent(TransformationComponent.class).getPosition().y < GROUND_Y) {
+                if (!entity.containsComponent(SquashedComponent.class) && entity.getComponent(TransformationComponent.class).getPosition().y < GROUND_Y) {
                     entity.getComponent(VelocityComponent.class).setVelocity(0, 0, 0);
                     entity.getComponent(TransformationComponent.class).setPosition(PLAYER_POSITION_X, GROUND_Y, 0);
                 } else {
@@ -384,7 +394,9 @@ public class DukeGameClient extends ClientBase {
                 var velocity = entity.getComponent(VelocityComponent.class).getVelocity();
                 var transformationComponent = entity.getComponent(TransformationComponent.class);
                 transformationComponent.translate(velocity.x * deltaTime, velocity.y * deltaTime, velocity.z * deltaTime);
-                if (transformationComponent.getPosition().y < GROUND_Y) transformationComponent.setPosition(transformationComponent.getPosition().x, GROUND_Y, transformationComponent.getPosition().z);
+                if (entity.containsComponent(PlayerComponent.class) && transformationComponent.getPosition().y < GROUND_Y) {
+                    transformationComponent.setPosition(transformationComponent.getPosition().x, GROUND_Y, transformationComponent.getPosition().z);
+                }
             });
         }
     }
@@ -413,8 +425,12 @@ public class DukeGameClient extends ClientBase {
 
             manager.getEntitiesWith(BugComponent.class, TransformationComponent.class).forEach(entity -> {
                 var transformation = entity.getComponent(TransformationComponent.class);
-                transformation.translate(deltaTime * MOVEMENT_SPEED * BUG_SPEED_MULTIPLIER * (alive ? 1 : 0.2f), 0, 0);
-                if (transformation.getPosition().x < (-600)) manager.freeEntity(entity);
+                if (!entity.containsComponent(SquashedComponent.class)) {
+                    transformation.translate(deltaTime * MOVEMENT_SPEED * BUG_SPEED_MULTIPLIER * (alive ? 1 : 0.2f), 0, 0);
+                } else {
+                    transformation.rotate(0, 0, deltaTime * 0.25f);
+                }
+                if (transformation.getPosition().x < -600 || transformation.getPosition().y < -600) manager.freeEntity(entity);
             });
         }
     }
@@ -447,15 +463,24 @@ public class DukeGameClient extends ClientBase {
             var playerY = transformation.getPosition().y;
 
             for (Entity entity : manager.getEntitiesWith(BugComponent.class, TransformationComponent.class)) {
+                if (entity.containsComponent(SquashedComponent.class)) continue;
                 var entityTransformation = entity.getComponent(TransformationComponent.class);
                 var bugX = entityTransformation.getPosition().x;
                 var bugY = entityTransformation.getPosition().y;
                 if (intersects(playerX, playerY, bugX, bugY)) {
-                    DukeGameClient.getInstance().getStateHandler().getState(GAME_STATE).setValue(GameState.DEAD);
-                    player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_DEATH);
+                    Log.info((playerY - bugY) + " " + SQUASH_OFFSET);
+                    if (!entity.containsComponent(SquashedComponent.class) && playerY - bugY > SQUASH_OFFSET) {
+                        entity.addComponent(SquashedComponent.class);
+                        entity.addComponent(VelocityComponent.class);
+                        getInstance().getStateHandler().updateState(CURRENT_SCORE, ((int) getInstance().getStateHandler().getState(CURRENT_SCORE).getValue()) + 10);
+                        entity.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_SQUASH);
+                        player.getComponent(VelocityComponent.class).addVelocity(0, SQUASH_UPFORCE, 0);
+                    } else {
+                        DukeGameClient.getInstance().getStateHandler().getState(GAME_STATE).setValue(GameState.DEAD);
+                        player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_DEATH);
+                    }
                 }
             }
-
         }
 
         private boolean intersects(float playerX, float playerY, float bugX, float bugY) {
@@ -525,9 +550,24 @@ public class DukeGameClient extends ClientBase {
         }
     }
 
+    public static class SquashedComponent implements Component {
+
+        @Override
+        public void setDefaults() {
+
+        }
+    }
+
     public static class BackgroundComponent implements Component {
         @Override
         public void setDefaults() { }
+    }
+
+    public static class PlayerComponent implements Component {
+        @Override
+        public void setDefaults() {
+
+        }
     }
 
     public static class DRAWUIRenderNode extends UIRenderNode {
@@ -780,7 +820,7 @@ public class DukeGameClient extends ClientBase {
 
             if (isEnabled()) {
                 var manager = ClientBase.getInstance().getManager();
-                var player = manager.getFirstEntityWith(TransformationComponent.class, VelocityComponent.class);
+                var player = manager.getFirstEntityWith(PlayerComponent.class);
                 if (player.getComponent(TransformationComponent.class).getPosition().y <= GROUND_Y) {
                     player.getComponent(VelocityComponent.class).setVelocity(0, JUMP_FORCE, 0);
                     player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_JUMP);
@@ -800,7 +840,7 @@ public class DukeGameClient extends ClientBase {
         return DukeGameClient.getInstance().getStateHandler().getState(GAME_STATE).getValue().equals(GameState.GAME_RUNNING);
     }
 
-    public static record Score(String scoreHolder, int score) implements Comparable<Score> {
+    public record Score(String scoreHolder, int score) implements Comparable<Score> {
 
         @Override
         public int compareTo(Score o) {
