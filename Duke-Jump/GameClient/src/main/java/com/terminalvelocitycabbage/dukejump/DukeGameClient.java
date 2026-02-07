@@ -70,6 +70,12 @@ public class DukeGameClient extends ClientBase {
     public static Identifier BUG_MODEL;
     public static Identifier BACKGROUND_MODEL;
 
+    //Sounds
+    public static Identifier SOUND_JUMP_RESOURCE;
+    public static Identifier SOUND_JUMP;
+    public static Identifier SOUND_DEATH_RESOURCE;
+    public static Identifier SOUND_DEATH;
+
     //Fonts
     public static Identifier PIXEL_FONT_RESOURCE;
     public static Identifier PIXEL_FONT;
@@ -149,6 +155,16 @@ public class DukeGameClient extends ClientBase {
             BUG_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "bug.png").getIdentifier();
             BACKGROUND_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "background.png").getIdentifier();
         });
+        getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.SOUND), e -> {
+            ResourceRegistrationEvent event = (ResourceRegistrationEvent) e;
+            SOUND_JUMP_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "jump.ogg").getIdentifier();
+            SOUND_DEATH_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "death.ogg").getIdentifier();
+        });
+        getEventDispatcher().listenToEvent(SoundRegistrationEvent.EVENT, e -> {
+            SoundRegistrationEvent event = (SoundRegistrationEvent) e;
+            SOUND_JUMP = event.registerSound(SOUND_JUMP_RESOURCE);
+            SOUND_DEATH = event.registerSound(SOUND_DEATH_RESOURCE);
+        });
         getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.FONT), e -> {
             ResourceRegistrationEvent event = (ResourceRegistrationEvent) e;
             PIXEL_FONT_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.FONT, "pixel_font.ttf").getIdentifier();
@@ -188,6 +204,8 @@ public class DukeGameClient extends ClientBase {
             event.registerComponent(GroundComponent.class);
             event.registerComponent(BugComponent.class);
             event.registerComponent(BackgroundComponent.class);
+            event.registerComponent(SoundSourceComponent.class);
+            event.registerComponent(SoundListenerComponent.class);
         });
         getEventDispatcher().listenToEvent(EntitySystemRegistrationEvent.EVENT, e -> {
             EntitySystemRegistrationEvent event = (EntitySystemRegistrationEvent) e;
@@ -206,9 +224,11 @@ public class DukeGameClient extends ClientBase {
                 entity.addComponent(ModelComponent.class).setModel(DUKE_MODEL);
                 entity.addComponent(TransformationComponent.class).setPosition(PLAYER_POSITION_X, GROUND_Y, 0).setScale(SCALE);
                 entity.addComponent(VelocityComponent.class);
+                entity.addComponent(SoundSourceComponent.class);
+                entity.addComponent(SoundListenerComponent.class);
             });
             PLAYER_CAMERA_ENTITY = event.createEntityTemplate(ID, "player_camera", entity -> {
-                entity.addComponent(PositionComponent.class).setPosition(0, 0, -100);
+                entity.addComponent(TransformationComponent.class).setPosition(0, 0, -100);
                 entity.addComponent(FixedOrthoCameraComponent.class);
             });
             GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
@@ -410,6 +430,7 @@ public class DukeGameClient extends ClientBase {
                 var bugY = entityTransformation.getPosition().y;
                 if (intersects(playerX, playerY, bugX, bugY)) {
                     DukeGameClient.getInstance().getStateHandler().getState(ALIVE_STATE).setValue(false);
+                    player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_DEATH);
                 }
             }
 
@@ -528,6 +549,7 @@ public class DukeGameClient extends ClientBase {
             var client = DukeGameClient.getInstance();
             var player = client.getManager().getFirstEntityWith(FixedOrthoCameraComponent.class);
             var camera = player.getComponent(FixedOrthoCameraComponent.class);
+            var transformation = player.getComponent(TransformationComponent.class).getTransformation();
             var shaderProgram = getShaderProgram();
 
             if (properties.isResized()) {
@@ -537,7 +559,7 @@ public class DukeGameClient extends ClientBase {
             shaderProgram.bind();
             shaderProgram.getUniform("textureSampler").setUniform(0);
             shaderProgram.getUniform("projectionMatrix").setUniform(camera.getProjectionMatrix());
-            shaderProgram.getUniform("viewMatrix").setUniform(camera.getViewMatrix(player));
+            shaderProgram.getUniform("viewMatrix").setUniform(camera.getViewMatrix(transformation));
 
             var entities = client.getManager().getEntitiesWith(ModelComponent.class, TransformationComponent.class);
 
@@ -584,11 +606,11 @@ public class DukeGameClient extends ClientBase {
 
             if (isEnabled()) {
                 var manager = ClientBase.getInstance().getManager();
-                manager.getEntitiesWith(TransformationComponent.class, VelocityComponent.class).forEach(entity -> {
-                    if (entity.getComponent(TransformationComponent.class).getPosition().y <= GROUND_Y) {
-                        entity.getComponent(VelocityComponent.class).setVelocity(0, JUMP_FORCE, 0);
-                    }
-                });
+                var player = manager.getFirstEntityWith(TransformationComponent.class, VelocityComponent.class);
+                if (player.getComponent(TransformationComponent.class).getPosition().y <= GROUND_Y) {
+                    player.getComponent(VelocityComponent.class).setVelocity(0, JUMP_FORCE, 0);
+                    player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_JUMP);
+                }
             }
         }
     }
