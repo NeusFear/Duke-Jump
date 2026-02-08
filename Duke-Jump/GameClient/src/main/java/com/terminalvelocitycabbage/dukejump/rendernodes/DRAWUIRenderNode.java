@@ -1,0 +1,202 @@
+package com.terminalvelocitycabbage.dukejump.rendernodes;
+
+import com.terminalvelocitycabbage.dukejump.DukeGameClient;
+import com.terminalvelocitycabbage.dukejump.components.BugComponent;
+import com.terminalvelocitycabbage.engine.client.ClientBase;
+import com.terminalvelocitycabbage.engine.client.renderer.shader.ShaderProgramConfig;
+import com.terminalvelocitycabbage.engine.client.ui.UIRenderNode;
+import com.terminalvelocitycabbage.engine.debug.Log;
+import com.terminalvelocitycabbage.engine.ecs.Entity;
+import com.terminalvelocitycabbage.engine.registry.Identifier;
+import com.terminalvelocitycabbage.templates.events.UICharInputEvent;
+import com.terminalvelocitycabbage.templates.events.UIClickEvent;
+import com.terminalvelocitycabbage.templates.events.UIScrollEvent;
+
+import java.util.Collections;
+
+public class DRAWUIRenderNode extends UIRenderNode {
+
+    public DRAWUIRenderNode(ShaderProgramConfig shaderProgramConfig) {
+        super(shaderProgramConfig);
+    }
+
+    @Override
+    protected Identifier[] getInterestedEvents() {
+        return new Identifier[]{UIClickEvent.EVENT, UIScrollEvent.EVENT, UICharInputEvent.EVENT};
+    }
+
+    @Override
+    protected void declareUI() {
+
+        DukeGameClient.GameState state = (DukeGameClient.GameState) DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.GAME_STATE).getValue();
+        boolean alive = DukeGameClient.isAlive();
+        boolean paused = state.equals(DukeGameClient.GameState.PAUSED);
+        boolean dead = state.equals(DukeGameClient.GameState.DEAD);
+        boolean mainMenu = state.equals(DukeGameClient.GameState.MAIN_MENU);
+
+        if (!alive) {
+            var currentScore = DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue();
+            container("grow-y grow-x px-[140] py-[30]", () -> {
+                container("grow-x grow-y layout-y-[ttb]", () -> {
+                    titleText();
+                    if (dead) {
+                        container("layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]", () -> {
+                            container("layout-y-[ttb] p-[10] grow-x align-x-[center]", () -> {
+                                text("YOU DIED.", "grow-x text-size-[60] text-color-[1,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+                            });
+                            container("layout-y-[ttb] pb-[2] grow-x align-x-[center]", () -> {
+                                text("Score: " + currentScore, "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+                            });
+                            container("layout-y-[ttb] grow-x p-[10] gap-[5]", () -> {
+                                nameInput();
+                            });
+                            mainMenuButton();
+                        });
+                    }
+                    if (mainMenu) {
+                        highScores();
+                    }
+                    if (paused) {
+                        //TODO
+                        container("layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]", () -> {
+                            text("PAUSED", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+                        });
+                    }
+                    container("grow-x h-[80] py-[10] gap-[10]", () -> {
+                        if (!dead) {
+                            playButton();
+                            quitButton();
+                        }
+                    });
+                });
+            });
+        } else {
+            container("float-root z-[10] align-x-[center] align-y-[center] w-[100] h-[30] attach-[top] to-[top] float-offset-y-[30] p-[10]", () -> {
+                text(DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue().toString(),
+                        "text-size-[40] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+            });
+        }
+    }
+
+    private void titleText() {
+        container("grow-x px-[40] py-[5] align-x-[center]", () -> {
+            text("DUKE JUMP", "text-size-[40] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+        });
+    }
+
+    private void mainMenuButton() {
+
+        int buttonID = id("mainMenuButton");
+
+        container(buttonID, "grow-x mt-[10] h-[40px] p-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+            text("RETURN TO MAIN MENU", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+        });
+
+        if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+            DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
+            DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.MAIN_MENU);
+            DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+        }
+    }
+
+    private void nameInput() {
+
+        int inputId = id("nameInput");
+        int buttonID = id("submitNameButton");
+        var textState = useState(inputId + "_text", "");
+
+        container("grow-x layout-y-[ttb] gap-5", () -> {
+            text("Save High Score:", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+            input(inputId, "bg-[1,1,1,1] grow-x h-[40px] p-[5] layout-x-[rtr] align-y-[center] gap-[2] border-color-[0,0,0,1] border-width-[3] clip",
+                    "bg-[1,0,0,1] w-[2px] h-[20px]",
+                    "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]"
+            );
+
+            container(buttonID, "grow-x mt-[10] h-[40px] py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+                text("SUBMIT", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+            });
+        });
+
+        if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+            DukeGameClient.HIGH_SCORES.add(new DukeGameClient.Score(textState.getValue(), (Integer) ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue()));
+            Collections.sort(DukeGameClient.HIGH_SCORES);
+            DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
+            DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.MAIN_MENU);
+            DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+        }
+    }
+
+    private void listItem(String first, String middle, String last, boolean compared) {
+        container("grow-x layout-x-[ltr] gap-[5] bg-[.9,.9,.9,1] p-[4]" + (compared ? "px-[30]" : ""), () -> {
+            container("bg-[1,1,1,1] p-[4]", () -> text(first, "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]"));
+            text(middle, "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+            container("grow-x", () -> {
+            });
+            text(last, "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+        });
+    }
+
+    private void highScores() {
+        container("grow-x px-[40] py-[5] align-x-[center]", () -> {
+            text("High Scores", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+        });
+        container("grow-x layout-x-[ltr] gap-[5] px-[8] pt-[10] bg-[1,1,1,1]", () -> {
+            text("Place", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+            container("grow-x", () -> {
+            });
+            text("Player", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+            container("grow-x", () -> {
+            });
+            text("Score", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+        });
+        scrollableContainer(
+                "bg-[1,16,1,1] layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]",
+                "bg-[1,0,0,1] w-[10px] fit-y", () -> {
+                    if (DukeGameClient.HIGH_SCORES.isEmpty()) {
+                        container("grow layout-x-[ltr] gap-[5] bg-[.9,.9,.9,1] p-[4]", () -> {
+                            container("grow", () -> {
+                            });
+                            text("No High Scores Recorded", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+                            container("grow", () -> {
+                            });
+                        });
+                    }
+                    for (int i = 0; i < DukeGameClient.HIGH_SCORES.size(); i++) {
+                        DukeGameClient.Score score = DukeGameClient.HIGH_SCORES.get(i);
+                        listItem(String.valueOf(i + 1), score.scoreHolder(), String.valueOf(score.score()), false);
+                    }
+                    container("h-[20]", () -> {
+                    });
+                });
+    }
+
+    private void playButton() {
+
+        int buttonID = id("playButton");
+
+        if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+            DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
+            DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.GAME_RUNNING);
+            DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+            Log.info("Play button clicked");
+        }
+
+        container(buttonID, "grow py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+            text("PLAY", "text-size-[40] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+        });
+    }
+
+    private void quitButton() {
+
+        int buttonID = id("quitButton");
+
+        if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+            DukeGameClient.getInstance().getWindowManager().closeFocusedWindow();
+            Log.info("Quit button clicked, closing focused window");
+        }
+
+        container(buttonID, "grow py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+            text("QUIT", "text-size-[40] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+        });
+    }
+}
