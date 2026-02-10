@@ -14,9 +14,9 @@ import com.terminalvelocitycabbage.templates.events.UIScrollEvent;
 
 import java.util.Collections;
 
-public class DRAWUIRenderNode extends UIRenderNode {
+public class DrawUIRenderNode extends UIRenderNode {
 
-    public DRAWUIRenderNode(ShaderProgramConfig shaderProgramConfig) {
+    public DrawUIRenderNode(ShaderProgramConfig shaderProgramConfig) {
         super(shaderProgramConfig);
     }
 
@@ -41,15 +41,16 @@ public class DRAWUIRenderNode extends UIRenderNode {
                     titleText();
                     if (dead) {
                         container("layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]", () -> {
-                            container("layout-y-[ttb] p-[10] grow-x align-x-[center]", () -> {
+                            container("layout-y-[ttb] grow-x align-x-[center]", () -> {
                                 text("YOU DIED.", "grow-x text-size-[60] text-color-[1,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
                             });
                             container("layout-y-[ttb] pb-[2] grow-x align-x-[center]", () -> {
                                 text("Score: " + currentScore, "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
                             });
-                            container("layout-y-[ttb] grow-x p-[10] gap-[5]", () -> {
+                            container("layout-y-[ttb] grow-x", () -> {
                                 nameInput();
                             });
+                            retryButton();
                             mainMenuButton();
                         });
                     }
@@ -84,6 +85,21 @@ public class DRAWUIRenderNode extends UIRenderNode {
         });
     }
 
+    private void retryButton() {
+
+        int buttonID = id("retryMenuButton");
+
+        container(buttonID, "grow-x mt-[10] h-[40px] p-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
+            text("RETRY WITHOUT SAVING SCORE", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+        });
+
+        if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
+            DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
+            DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.GAME_RUNNING);
+            DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+        }
+    }
+
     private void mainMenuButton() {
 
         int buttonID = id("mainMenuButton");
@@ -105,7 +121,7 @@ public class DRAWUIRenderNode extends UIRenderNode {
         int buttonID = id("submitNameButton");
         var textState = useState(inputId + "_text", "");
 
-        container("grow-x layout-y-[ttb] gap-5", () -> {
+        container("grow-x layout-y-[ttb]", () -> {
             text("Save High Score:", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
             input(inputId, "bg-[1,1,1,1] grow-x h-[40px] p-[5] layout-x-[rtr] align-y-[center] gap-[2] border-color-[0,0,0,1] border-width-[3] clip",
                     "bg-[1,0,0,1] w-[2px] h-[20px]",
@@ -118,12 +134,22 @@ public class DRAWUIRenderNode extends UIRenderNode {
         });
 
         if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
-            DukeGameClient.HIGH_SCORES.add(new DukeGameClient.Score(textState.getValue(), (Integer) ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue()));
-            Collections.sort(DukeGameClient.HIGH_SCORES);
-            DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
-            DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.MAIN_MENU);
-            DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+            addHighScoreAndReturnToMainMenu(textState.getValue(), (Integer) ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue());
         }
+
+        if (heardEvent(inputId, UICharInputEvent.EVENT) instanceof UICharInputEvent event) {
+            if (event.isSpecialInput() && event.isEnter()) {
+                addHighScoreAndReturnToMainMenu(textState.getValue(), (Integer) ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue());
+            }
+        }
+    }
+
+    private void addHighScoreAndReturnToMainMenu(String name, int score) {
+        DukeGameClient.HIGH_SCORES.add(new DukeGameClient.Score(name, score));
+        Collections.sort(DukeGameClient.HIGH_SCORES);
+        DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
+        DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.MAIN_MENU);
+        DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
     }
 
     private void listItem(String first, String middle, String last, boolean compared) {

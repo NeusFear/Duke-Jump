@@ -3,7 +3,7 @@ package com.terminalvelocitycabbage.dukejump;
 import com.terminalvelocitycabbage.dukejump.components.*;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.CloseGameController;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.JumpController;
-import com.terminalvelocitycabbage.dukejump.rendernodes.DRAWUIRenderNode;
+import com.terminalvelocitycabbage.dukejump.rendernodes.DrawUIRenderNode;
 import com.terminalvelocitycabbage.dukejump.rendernodes.DrawSceneRenderNode;
 import com.terminalvelocitycabbage.dukejump.scenes.DefaultScene;
 import com.terminalvelocitycabbage.dukejump.systems.*;
@@ -318,7 +318,7 @@ public class DukeGameClient extends ClientBase {
                     new RenderGraph(RenderGraph.RenderPath.builder()
                             .addRoutineNode(DEFAULT_ROUTINE)
                             .addRenderNode(event.registerNode(ID, "draw_scene"), DrawSceneRenderNode.class, DEFAULT_SHADER_PROGRAM_CONFIG)
-                            .addRenderNode(event.registerNode(ID, "draw_ui"), DRAWUIRenderNode.class, ShaderProgramConfig.EMPTY)
+                            .addRenderNode(event.registerNode(ID, "draw_ui"), DrawUIRenderNode.class, ShaderProgramConfig.EMPTY)
                     )
             );
         });
