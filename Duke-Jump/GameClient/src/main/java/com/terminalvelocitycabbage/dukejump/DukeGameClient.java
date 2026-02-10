@@ -263,6 +263,10 @@ public class DukeGameClient extends ClientBase {
         });
         getEventDispatcher().listenToEvent(EntityTemplateRegistrationEvent.EVENT, e -> {
             EntityTemplateRegistrationEvent event = (EntityTemplateRegistrationEvent) e;
+            PLAYER_CAMERA_ENTITY = event.createEntityTemplate(ID, "player_camera", entity -> {
+                entity.addComponent(TransformationComponent.class).setPosition(0, 0, -10);
+                entity.addComponent(FixedOrthoCameraComponent.class);
+            });
             DUKE_ENTITY = event.createEntityTemplate(ID, "duke", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(DUKE_IDLE_1_MODEL);
                 entity.addComponent(AnimatedSpriteComponent.class)
@@ -277,24 +281,20 @@ public class DukeGameClient extends ClientBase {
                 entity.addComponent(SoundListenerComponent.class);
                 entity.addComponent(PlayerComponent.class);
             });
-            PLAYER_CAMERA_ENTITY = event.createEntityTemplate(ID, "player_camera", entity -> {
-                entity.addComponent(TransformationComponent.class).setPosition(0, 0, -100);
-                entity.addComponent(FixedOrthoCameraComponent.class);
-            });
-            GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
-                entity.addComponent(ModelComponent.class).setModel(GROUND_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(-300, GROUND_Y - 150, -5).setScale(SCALE*4f);
-                entity.addComponent(GroundComponent.class);
-            });
             BUG_ENTITY = event.createEntityTemplate(ID, "bug", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(BUG_MODEL);
                 entity.addComponent(BugComponent.class);
-                entity.addComponent(TransformationComponent.class).setPosition(BUG_START_POSITION_X, GROUND_Y, 5).setScale(SCALE);
+                entity.addComponent(TransformationComponent.class).setPosition(BUG_START_POSITION_X, GROUND_Y, 1).setScale(SCALE);
                 entity.addComponent(SoundSourceComponent.class);
+            });
+            GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
+                entity.addComponent(ModelComponent.class).setModel(GROUND_MODEL);
+                entity.addComponent(TransformationComponent.class).setPosition(-300, GROUND_Y - 150, -1).setScale(SCALE*4f);
+                entity.addComponent(GroundComponent.class);
             });
             BACKGROUND_ENTITY = event.createEntityTemplate(ID, "background", entity -> {
                 entity.addComponent(ModelComponent.class).setModel(BACKGROUND_MODEL);
-                entity.addComponent(TransformationComponent.class).setPosition(-300, 80, -10).setScale((SCALE+1)*8f);
+                entity.addComponent(TransformationComponent.class).setPosition(-300, 80, -2).setScale((SCALE+1)*8f);
                 entity.addComponent(BackgroundComponent.class);
             });
         });
