@@ -19,3 +19,4 @@ Features:
 - [x] retry (instead of having to restart the game every time)
 - [x] Add backspace to text input
 - [x] Allow pressing enter to submit high score
+- [ ] A simple tutorial to teach new players the controls and objective
