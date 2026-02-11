@@ -7,8 +7,8 @@ It is written entireley in Java, and uses my own game engine TerminalVelocityEng
 Features:
 - [x] Jump to help Duke dodge bugs
 - [x] Keep score of how many bugs you've avoided
-- [ ] Animated Duke and Bug Walking
-- [ ] Flying Bugs that you need to jump over or duck under (depending on height)
+- [x] Animated Duke and Bug Walking
+- [x] Flying Bugs that you need to jump over or duck under (depending on height)
 - [x] Bonus points for jumping on (and squashing) bugs
 - [ ] Sounds/Animations for milestones
 - [x] High Scores
@@ -17,5 +17,5 @@ Features:
 - [x] Main menu
 - [ ] Pause the game
 - [x] retry (instead of having to restart the game every time)
-- [ ] Add backspace to text input
-- [ ] Allow pressing enter to submit high score
+- [x] Add backspace to text input
+- [x] Allow pressing enter to submit high score
