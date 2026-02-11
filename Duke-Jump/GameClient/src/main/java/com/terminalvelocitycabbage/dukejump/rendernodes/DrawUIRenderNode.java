@@ -94,9 +94,7 @@ public class DrawUIRenderNode extends UIRenderNode {
         });
 
         if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
-            DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
-            DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.GAME_RUNNING);
-            DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+            DukeGameClient.restart(false);
         }
     }
 
@@ -109,9 +107,7 @@ public class DrawUIRenderNode extends UIRenderNode {
         });
 
         if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
-            DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
-            DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.MAIN_MENU);
-            DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+            DukeGameClient.restart(true);
         }
     }
 
@@ -147,9 +143,7 @@ public class DrawUIRenderNode extends UIRenderNode {
     private void addHighScoreAndReturnToMainMenu(String name, int score) {
         DukeGameClient.HIGH_SCORES.add(new DukeGameClient.Score(name, score));
         Collections.sort(DukeGameClient.HIGH_SCORES);
-        DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
-        DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.MAIN_MENU);
-        DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+        DukeGameClient.restart(true);
     }
 
     private void listItem(String first, String middle, String last, boolean compared) {
@@ -201,10 +195,7 @@ public class DrawUIRenderNode extends UIRenderNode {
         int buttonID = id("playButton");
 
         if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
-            DukeGameClient.getInstance().getManager().getEntitiesWith(BugComponent.class).forEach(Entity::free);
-            DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.GAME_RUNNING);
-            DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
-            Log.info("Play button clicked");
+            DukeGameClient.restart(false);
         }
 
         container(buttonID, "grow py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {

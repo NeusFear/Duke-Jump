@@ -2,6 +2,8 @@ package com.terminalvelocitycabbage.dukejump.systems;
 
 import com.terminalvelocitycabbage.dukejump.DukeGameClient;
 import com.terminalvelocitycabbage.dukejump.components.BugComponent;
+import com.terminalvelocitycabbage.dukejump.components.EnemyComponent;
+import com.terminalvelocitycabbage.dukejump.components.FlyComponent;
 import com.terminalvelocitycabbage.dukejump.components.SquashedComponent;
 import com.terminalvelocitycabbage.engine.client.ClientBase;
 import com.terminalvelocitycabbage.engine.debug.Log;
@@ -25,17 +27,19 @@ public class CheckForCollisionSystem extends System {
         var playerX = transformation.getPosition().x;
         var playerY = transformation.getPosition().y;
 
-        for (Entity entity : manager.getEntitiesWith(BugComponent.class, TransformationComponent.class)) {
+        for (Entity entity : manager.getEntitiesWith(EnemyComponent.class)) {
             if (entity.hasComponent(SquashedComponent.class)) continue;
             var entityTransformation = entity.getComponent(TransformationComponent.class);
             var bugX = entityTransformation.getPosition().x;
             var bugY = entityTransformation.getPosition().y;
             if (intersects(playerX, playerY, bugX, bugY)) {
-                Log.info((playerY - bugY) + " " + DukeGameClient.SQUASH_OFFSET);
                 if (!entity.hasComponent(SquashedComponent.class) && playerY - bugY > DukeGameClient.SQUASH_OFFSET) {
                     entity.addComponent(SquashedComponent.class);
                     entity.addComponent(VelocityComponent.class);
-                    ClientBase.getInstance().getStateHandler().updateState(DukeGameClient.CURRENT_SCORE, ((int) ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue()) + 10);
+                    var points = (entity.hasComponent(FlyComponent.class)) ? 50 : 10;
+                    ClientBase.getInstance().getStateHandler()
+                            .updateState(DukeGameClient.CURRENT_SCORE,
+                                    ((int) ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue()) + points);
                     entity.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_SQUASH);
                     player.getComponent(VelocityComponent.class).addVelocity(0, DukeGameClient.SQUASH_UPFORCE, 0);
                 } else {

@@ -2,6 +2,8 @@ package com.terminalvelocitycabbage.dukejump.systems;
 
 import com.terminalvelocitycabbage.dukejump.DukeGameClient;
 import com.terminalvelocitycabbage.dukejump.components.AnimatedSpriteComponent;
+import com.terminalvelocitycabbage.dukejump.components.BugComponent;
+import com.terminalvelocitycabbage.dukejump.components.FlyComponent;
 import com.terminalvelocitycabbage.dukejump.components.PlayerComponent;
 import com.terminalvelocitycabbage.engine.ecs.Manager;
 import com.terminalvelocitycabbage.engine.ecs.System;
@@ -31,6 +33,10 @@ public class AnimateSpritesSystem extends System {
                 if (gameState.getValue().equals(DukeGameClient.GameState.DEAD)) {
                     state = "dead";
                 }
+            }
+
+            if (entity.hasComponent(BugComponent.class) || entity.hasComponent(FlyComponent.class)) {
+                state = "any";
             }
 
             var modelComponent = entity.getComponent(ModelComponent.class);

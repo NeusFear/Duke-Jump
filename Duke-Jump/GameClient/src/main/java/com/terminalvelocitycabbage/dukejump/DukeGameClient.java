@@ -24,6 +24,7 @@ import com.terminalvelocitycabbage.engine.client.renderer.shader.Shader;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.ShaderProgramConfig;
 import com.terminalvelocitycabbage.engine.client.renderer.shader.Uniform;
 import com.terminalvelocitycabbage.engine.client.window.WindowProperties;
+import com.terminalvelocitycabbage.engine.ecs.Entity;
 import com.terminalvelocitycabbage.engine.filesystem.resources.ResourceCategory;
 import com.terminalvelocitycabbage.engine.filesystem.resources.ResourceSource;
 import com.terminalvelocitycabbage.engine.filesystem.sources.MainSource;
@@ -64,7 +65,10 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DUKE_JUMP_TEXTURE;
     public static Identifier DUKE_DEAD_TEXTURE;
     public static Identifier GROUND_TEXTURE;
-    public static Identifier BUG_TEXTURE;
+    public static Identifier BUG_0_TEXTURE;
+    public static Identifier BUG_1_TEXTURE;
+    public static Identifier FLY_0_TEXTURE;
+    public static Identifier FLY_1_TEXTURE;
     public static Identifier BACKGROUND_TEXTURE;
 
     //Meshes and Models
@@ -77,7 +81,10 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DUKE_JUMP_MODEL;
     public static Identifier DUKE_DEAD_MODEL;
     public static Identifier GROUND_MODEL;
-    public static Identifier BUG_MODEL;
+    public static Identifier BUG_0_MODEL;
+    public static Identifier BUG_1_MODEL;
+    public static Identifier FLY_0_MODEL;
+    public static Identifier FLY_1_MODEL;
     public static Identifier BACKGROUND_MODEL;
 
     //Sounds
@@ -105,12 +112,14 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DUKE_ENTITY;
     public static Identifier GROUND_ENTITY;
     public static Identifier BUG_ENTITY;
+    public static Identifier FLY_ENTITY;
     public static Identifier BACKGROUND_ENTITY;
     public static Identifier PLAYER_CAMERA_ENTITY;
 
     //STATES
     public static Identifier CURRENT_SCORE;
     public static Identifier GAME_STATE;
+    public static Identifier PASSED_ENEMIES_THIS_ROUND;
 
     //Game Configuration
     public static float MOVEMENT_SPEED = -0.5f;
@@ -121,10 +130,19 @@ public class DukeGameClient extends ClientBase {
     public static final int GROUND_PARTS = 8;
     public static final int GROUND_Y = -100;
     public static final int PLAYER_POSITION_X = -300;
-    public static final int BUG_START_POSITION_X = 500;
+    //Enemies
+    public static final int ENEMY = 500;
     public static final float BUG_SPEED_MULTIPLIER = 1.2f;
     public static final int BUG_FREQUENCY = 1000; //duration in ms between bug spawns
     public static final int BUG_FREQUENCY_VARIANCE = 600;
+    //Flying Enemies
+    public static final float FLY_CHANCE = .25f;
+    public static final float FLY_SPEED_MULTIPLIER = 1.5f;
+    public static final float FLY_HEIGHT_VARIANCE = 10f;
+    public static final float FLY_HEIGHT_SPEED = 100f;
+    public static final int FLY_WAIT = 10;
+    public static final int FLY_BASE_HEIGHT = 55;
+    //Background
     public static final float BACKGROUND_SPEED_MULTIPLIER = 0.2f;
     public static final int BACKGROUND_PARTS = 5;
     public static final float INTERSECTION_RADIUS = SCALE / 2f;
@@ -177,7 +195,10 @@ public class DukeGameClient extends ClientBase {
             DUKE_JUMP_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke_jump_0.png").getIdentifier();
             DUKE_DEAD_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke_dead.png").getIdentifier();
             GROUND_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "ground.png").getIdentifier();
-            BUG_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "bug.png").getIdentifier();
+            BUG_0_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "bug_0.png").getIdentifier();
+            BUG_1_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "bug_1.png").getIdentifier();
+            FLY_0_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "fly_0.png").getIdentifier();
+            FLY_1_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "fly_1.png").getIdentifier();
             BACKGROUND_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "background.png").getIdentifier();
         });
         getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.SOUND), e -> {
@@ -213,7 +234,10 @@ public class DukeGameClient extends ClientBase {
             event.addTexture(DUKE_WALK_2_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_JUMP_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_DEAD_TEXTURE, TEXTURE_ATLAS);
-            event.addTexture(BUG_TEXTURE, TEXTURE_ATLAS);
+            event.addTexture(BUG_0_TEXTURE, TEXTURE_ATLAS);
+            event.addTexture(BUG_1_TEXTURE, TEXTURE_ATLAS);
+            event.addTexture(FLY_0_TEXTURE, TEXTURE_ATLAS);
+            event.addTexture(FLY_1_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(BACKGROUND_TEXTURE, TEXTURE_ATLAS);
         });
         getEventDispatcher().listenToEvent(MeshRegistrationEvent.EVENT, e -> {
@@ -230,7 +254,10 @@ public class DukeGameClient extends ClientBase {
             DUKE_JUMP_MODEL = event.registerModel(ID, "duke_jump", SPRITE_MESH, DUKE_JUMP_TEXTURE);
             DUKE_DEAD_MODEL = event.registerModel(ID, "duke_dead", SPRITE_MESH, DUKE_DEAD_TEXTURE);
             GROUND_MODEL = event.registerModel(ID, "ground", SPRITE_MESH, GROUND_TEXTURE);
-            BUG_MODEL = event.registerModel(ID, "bug", SPRITE_MESH, BUG_TEXTURE);
+            BUG_0_MODEL = event.registerModel(ID, "bug_0", SPRITE_MESH, BUG_0_TEXTURE);
+            BUG_1_MODEL = event.registerModel(ID, "bug_1", SPRITE_MESH, BUG_1_TEXTURE);
+            FLY_0_MODEL = event.registerModel(ID, "fly_0", SPRITE_MESH, FLY_0_TEXTURE);
+            FLY_1_MODEL = event.registerModel(ID, "fly_1", SPRITE_MESH, FLY_1_TEXTURE);
             BACKGROUND_MODEL = event.registerModel(ID, "background", SPRITE_MESH, BACKGROUND_TEXTURE);
         });
         getEventDispatcher().listenToEvent(EntityComponentRegistrationEvent.EVENT, e -> {
@@ -248,14 +275,16 @@ public class DukeGameClient extends ClientBase {
             event.registerComponent(SquashedComponent.class);
             event.registerComponent(PlayerComponent.class);
             event.registerComponent(AnimatedSpriteComponent.class);
+            event.registerComponent(FlyComponent.class);
+            event.registerComponent(EnemyComponent.class);
         });
         getEventDispatcher().listenToEvent(EntitySystemRegistrationEvent.EVENT, e -> {
             EntitySystemRegistrationEvent event = (EntitySystemRegistrationEvent) e;
             event.createSystem(GravitySystem.class);
             event.createSystem(AccelerationSystem.class);
             event.createSystem(UpdateGroundPositionsSystem.class);
-            event.createSystem(UpdateBugPositionSystem.class);
-            event.createSystem(SpawnBugSystem.class);
+            event.createSystem(UpdateEnemyPositionSystem.class);
+            event.createSystem(SpawnEnemySystem.class);
             event.createSystem(UpdateBackgroundPositionsSystem.class);
             event.createSystem(CheckForCollisionSystem.class);
             event.createSystem(CountPassedBugsSystem.class);
@@ -282,9 +311,23 @@ public class DukeGameClient extends ClientBase {
                 entity.addComponent(PlayerComponent.class);
             });
             BUG_ENTITY = event.createEntityTemplate(ID, "bug", entity -> {
-                entity.addComponent(ModelComponent.class).setModel(BUG_MODEL);
+                entity.addComponent(ModelComponent.class).setModel(BUG_0_MODEL);
+                entity.addComponent(AnimatedSpriteComponent.class)
+                        .addStateAndStages("any", 0.01f, BUG_0_MODEL, BUG_1_MODEL)
+                        .updateAnimation("any", 0.1f);
                 entity.addComponent(BugComponent.class);
-                entity.addComponent(TransformationComponent.class).setPosition(BUG_START_POSITION_X, GROUND_Y, 1).setScale(SCALE);
+                entity.addComponent(EnemyComponent.class);
+                entity.addComponent(TransformationComponent.class).setPosition(ENEMY, GROUND_Y, 1).setScale(SCALE);
+                entity.addComponent(SoundSourceComponent.class);
+            });
+            FLY_ENTITY = event.createEntityTemplate(ID, "fly", entity -> {
+                entity.addComponent(ModelComponent.class).setModel(FLY_0_MODEL);
+                entity.addComponent(AnimatedSpriteComponent.class)
+                        .addStateAndStages("any", 0.5f, FLY_0_MODEL, FLY_1_MODEL)
+                        .updateAnimation("any", 0.1f);
+                entity.addComponent(FlyComponent.class);
+                entity.addComponent(EnemyComponent.class);
+                entity.addComponent(TransformationComponent.class).setPosition(ENEMY, GROUND_Y + FLY_BASE_HEIGHT, 1).setScale(SCALE);
                 entity.addComponent(SoundSourceComponent.class);
             });
             GROUND_ENTITY = event.createEntityTemplate(ID, "ground", entity -> {
@@ -304,8 +347,8 @@ public class DukeGameClient extends ClientBase {
                     .addStep(event.registerStep(ID, "gravity"), GravitySystem.class)
                     .addStep(event.registerStep(ID, "acceleration"), AccelerationSystem.class)
                     .addStep(event.registerStep(ID, "update_ground_positions"), UpdateGroundPositionsSystem.class)
-                    .addStep(event.registerStep(ID, "update_bug_positions"), UpdateBugPositionSystem.class)
-                    .addStep(event.registerStep(ID, "spawn_bug"), SpawnBugSystem.class)
+                    .addStep(event.registerStep(ID, "update_bug_positions"), UpdateEnemyPositionSystem.class)
+                    .addStep(event.registerStep(ID, "spawn_bug"), SpawnEnemySystem.class)
                     .addStep(event.registerStep(ID, "update_background_positions"), UpdateBackgroundPositionsSystem.class)
                     .addStep(event.registerStep(ID, "check_for_collision"), CheckForCollisionSystem.class)
                     .addStep(event.registerStep(ID, "count_passed_bugs"), CountPassedBugsSystem.class)
@@ -349,7 +392,15 @@ public class DukeGameClient extends ClientBase {
             GameStateRegistrationEvent event = (GameStateRegistrationEvent) e;
             CURRENT_SCORE = event.registerState(ID, "score", 0);
             GAME_STATE = event.registerState(ID, "alive", GameState.MAIN_MENU);
+            PASSED_ENEMIES_THIS_ROUND = event.registerState(ID, "passed_enemies", 0);
         });
+    }
+
+    public static void restart(boolean returnToMainMenu) {
+        ClientBase.getInstance().getStateHandler().getState(DukeGameClient.PASSED_ENEMIES_THIS_ROUND).setValue(0);
+        ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
+        ClientBase.getInstance().getManager().getEntitiesWith(EnemyComponent.class).forEach(Entity::free);
+        ClientBase.getInstance().getStateHandler().getState(DukeGameClient.GAME_STATE).setValue(returnToMainMenu ? GameState.MAIN_MENU : GameState.GAME_RUNNING);
     }
 
     public static void main(String[] args) {
