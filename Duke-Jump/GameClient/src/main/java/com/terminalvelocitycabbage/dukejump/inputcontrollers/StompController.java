@@ -6,16 +6,13 @@ import com.terminalvelocitycabbage.engine.client.ClientBase;
 import com.terminalvelocitycabbage.engine.client.input.control.Control;
 import com.terminalvelocitycabbage.engine.client.input.controller.BooleanController;
 import com.terminalvelocitycabbage.engine.client.input.types.ButtonAction;
-import com.terminalvelocitycabbage.engine.debug.Log;
 import com.terminalvelocitycabbage.templates.ecs.components.SoundSourceComponent;
 import com.terminalvelocitycabbage.templates.ecs.components.TransformationComponent;
 import com.terminalvelocitycabbage.templates.ecs.components.VelocityComponent;
 
-public class JumpController extends BooleanController {
+public class StompController extends BooleanController {
 
-    private float jumpStamina;
-
-    public JumpController(Control... controls) {
+    public StompController(Control... controls) {
         super(ButtonAction.PRESSED, false, controls);
     }
 
@@ -24,25 +21,13 @@ public class JumpController extends BooleanController {
 
         if (!DukeGameClient.isAlive()) return;
 
-        var manager = ClientBase.getInstance().getManager();
-        var player = manager.getFirstEntityWith(PlayerComponent.class);
-        var transformation = player.getComponent(TransformationComponent.class);
-        var velocity = player.getComponent(VelocityComponent.class);
-        if (transformation.getPosition().y <= DukeGameClient.GROUND_Y){
-            jumpStamina = DukeGameClient.JUMP_FORCE;
-        }
-
         if (isEnabled()) {
-            if (transformation.getPosition().y <= DukeGameClient.GROUND_Y) {
+            var manager = ClientBase.getInstance().getManager();
+            var player = manager.getFirstEntityWith(PlayerComponent.class);
+            if (player.getComponent(TransformationComponent.class).getPosition().y > DukeGameClient.GROUND_Y) {
+                player.getComponent(VelocityComponent.class).setVelocity(0, -DukeGameClient.STOMP_FORCE, 0);
                 player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_JUMP);
-                velocity.setVelocity(0, DukeGameClient.JUMP_FORCE, 0);
-            } else {
-                if (velocity.getVelocity().y > 0) {
-                    velocity.addVelocity(0, jumpStamina, 0);
-                    jumpStamina *= DukeGameClient.JUMP_HOLD_FRICTION;
-                }
             }
-            Log.info(jumpStamina);
         }
     }
 }
