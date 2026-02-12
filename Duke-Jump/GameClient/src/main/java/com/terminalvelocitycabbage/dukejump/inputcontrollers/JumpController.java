@@ -6,16 +6,18 @@ import com.terminalvelocitycabbage.engine.client.ClientBase;
 import com.terminalvelocitycabbage.engine.client.input.control.Control;
 import com.terminalvelocitycabbage.engine.client.input.controller.BooleanController;
 import com.terminalvelocitycabbage.engine.client.input.types.ButtonAction;
+import com.terminalvelocitycabbage.engine.debug.Log;
 import com.terminalvelocitycabbage.templates.ecs.components.SoundSourceComponent;
 import com.terminalvelocitycabbage.templates.ecs.components.TransformationComponent;
 import com.terminalvelocitycabbage.templates.ecs.components.VelocityComponent;
 
 public class JumpController extends BooleanController {
 
+    private float jumpStamina;
+
     public JumpController(Control... controls) {
         super(ButtonAction.PRESSED, false, controls);
     }
-    private float jumpStamina;
 
     @Override
     public void act() {
@@ -24,18 +26,23 @@ public class JumpController extends BooleanController {
 
         var manager = ClientBase.getInstance().getManager();
         var player = manager.getFirstEntityWith(PlayerComponent.class);
-        if (player.getComponent(TransformationComponent.class).getPosition().y <= DukeGameClient.GROUND_Y){
+        var transformation = player.getComponent(TransformationComponent.class);
+        var velocity = player.getComponent(VelocityComponent.class);
+        if (transformation.getPosition().y <= DukeGameClient.GROUND_Y){
             jumpStamina = DukeGameClient.JUMP_FORCE;
         }
 
         if (isEnabled()) {
-            if (jumpStamina > 0.3f) {
-                player.getComponent(VelocityComponent.class).setVelocity(0, jumpStamina, 0);
+            if (transformation.getPosition().y <= DukeGameClient.GROUND_Y) {
                 player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_JUMP);
-
-                jumpStamina *= DukeGameClient.JUMP_HOLD_FRICTION;
+                velocity.setVelocity(0, DukeGameClient.JUMP_FORCE, 0);
+            } else {
+                if (velocity.getVelocity().y > 0) {
+                    velocity.addVelocity(0, jumpStamina, 0);
+                    jumpStamina *= DukeGameClient.JUMP_HOLD_FRICTION;
+                }
             }
+            Log.info(jumpStamina);
         }
-        else jumpStamina = 0.0f;
     }
 }
