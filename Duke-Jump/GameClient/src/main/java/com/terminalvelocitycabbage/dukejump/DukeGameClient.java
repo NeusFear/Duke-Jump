@@ -60,6 +60,7 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DUKE_WALK_0_TEXTURE;
     public static Identifier DUKE_WALK_1_TEXTURE;
     public static Identifier DUKE_WALK_2_TEXTURE;
+    public static Identifier DUKE_WALK_3_TEXTURE;
     public static Identifier DUKE_JUMP_TEXTURE;
     public static Identifier DUKE_DEAD_TEXTURE;
     public static Identifier GROUND_TEXTURE;
@@ -76,6 +77,7 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DUKE_WALK_0_MODEL;
     public static Identifier DUKE_WALK_1_MODEL;
     public static Identifier DUKE_WALK_2_MODEL;
+    public static Identifier DUKE_WALK_3_MODEL;
     public static Identifier DUKE_JUMP_MODEL;
     public static Identifier DUKE_DEAD_MODEL;
     public static Identifier GROUND_MODEL;
@@ -191,6 +193,7 @@ public class DukeGameClient extends ClientBase {
             DUKE_WALK_0_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke_walk_0.png").getIdentifier();
             DUKE_WALK_1_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke_walk_1.png").getIdentifier();
             DUKE_WALK_2_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke_walk_2.png").getIdentifier();
+            DUKE_WALK_3_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke_walk_3.png").getIdentifier();
             DUKE_JUMP_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke_jump_0.png").getIdentifier();
             DUKE_DEAD_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "duke_dead.png").getIdentifier();
             GROUND_TEXTURE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.TEXTURE, "ground.png").getIdentifier();
@@ -231,6 +234,7 @@ public class DukeGameClient extends ClientBase {
             event.addTexture(DUKE_WALK_0_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_WALK_1_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_WALK_2_TEXTURE, TEXTURE_ATLAS);
+            event.addTexture(DUKE_WALK_3_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_JUMP_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(DUKE_DEAD_TEXTURE, TEXTURE_ATLAS);
             event.addTexture(BUG_0_TEXTURE, TEXTURE_ATLAS);
@@ -250,6 +254,7 @@ public class DukeGameClient extends ClientBase {
             DUKE_WALK_0_MODEL = event.registerModel(ID, "duke_walk_0", SPRITE_MESH, DUKE_WALK_0_TEXTURE);
             DUKE_WALK_1_MODEL = event.registerModel(ID, "duke_walk_1", SPRITE_MESH, DUKE_WALK_1_TEXTURE);
             DUKE_WALK_2_MODEL = event.registerModel(ID, "duke_walk_2", SPRITE_MESH, DUKE_WALK_2_TEXTURE);
+            DUKE_WALK_3_MODEL = event.registerModel(ID, "duke_walk_3", SPRITE_MESH, DUKE_WALK_3_TEXTURE);
             DUKE_JUMP_MODEL = event.registerModel(ID, "duke_jump", SPRITE_MESH, DUKE_JUMP_TEXTURE);
             DUKE_DEAD_MODEL = event.registerModel(ID, "duke_dead", SPRITE_MESH, DUKE_DEAD_TEXTURE);
             GROUND_MODEL = event.registerModel(ID, "ground", SPRITE_MESH, GROUND_TEXTURE);
@@ -299,7 +304,7 @@ public class DukeGameClient extends ClientBase {
                 entity.addComponent(ModelComponent.class).setModel(DUKE_IDLE_1_MODEL);
                 entity.addComponent(AnimatedSpriteComponent.class)
                         .addStateAndStages("idle", 0.005f, DUKE_IDLE_0_MODEL, DUKE_IDLE_1_MODEL)
-                        .addStateAndStages("walk", 0.5f, DUKE_WALK_0_MODEL, DUKE_WALK_1_MODEL, DUKE_WALK_2_MODEL)
+                        .addStateAndStages("walk", 0.01f, DUKE_WALK_0_MODEL, DUKE_WALK_1_MODEL, DUKE_WALK_2_MODEL, DUKE_WALK_3_MODEL)
                         .addStateAndStages("jump", 1f, DUKE_JUMP_MODEL)
                         .addStateAndStages("dead", 0.5f, DUKE_DEAD_MODEL)
                         .updateAnimation("idle", 0.1f);
