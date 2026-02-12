@@ -122,7 +122,8 @@ public class DukeGameClient extends ClientBase {
     //Game Configuration
     public static float MOVEMENT_SPEED = -0.5f;
     public static final float GRAVITY = 0.005f;
-    public static final float JUMP_FORCE = 1.25f;
+    public static final float JUMP_FORCE = 0.9f;
+    public static final float JUMP_HOLD_FRICTION = 0.98f;
     public static final float SQUASH_UPFORCE = 0.75f;
     public static final float SCALE = 60f;
     public static final int GROUND_PARTS = 8;

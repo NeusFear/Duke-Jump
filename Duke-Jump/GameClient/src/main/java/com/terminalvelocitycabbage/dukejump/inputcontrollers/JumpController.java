@@ -15,19 +15,27 @@ public class JumpController extends BooleanController {
     public JumpController(Control... controls) {
         super(ButtonAction.PRESSED, false, controls);
     }
+    private float jumpStamina;
 
     @Override
     public void act() {
 
         if (!DukeGameClient.isAlive()) return;
 
+        var manager = ClientBase.getInstance().getManager();
+        var player = manager.getFirstEntityWith(PlayerComponent.class);
+        if (player.getComponent(TransformationComponent.class).getPosition().y <= DukeGameClient.GROUND_Y){
+            jumpStamina = DukeGameClient.JUMP_FORCE;
+        }
+
         if (isEnabled()) {
-            var manager = ClientBase.getInstance().getManager();
-            var player = manager.getFirstEntityWith(PlayerComponent.class);
-            if (player.getComponent(TransformationComponent.class).getPosition().y <= DukeGameClient.GROUND_Y) {
-                player.getComponent(VelocityComponent.class).setVelocity(0, DukeGameClient.JUMP_FORCE, 0);
+            if (jumpStamina > 0.3f) {
+                player.getComponent(VelocityComponent.class).setVelocity(0, jumpStamina, 0);
                 player.getComponent(SoundSourceComponent.class).playSound(DukeGameClient.SOUND_JUMP);
+
+                jumpStamina *= DukeGameClient.JUMP_HOLD_FRICTION;
             }
         }
+        else jumpStamina = 0.0f;
     }
 }
