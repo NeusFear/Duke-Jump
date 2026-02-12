@@ -122,9 +122,10 @@ public class DukeGameClient extends ClientBase {
     public static Identifier PASSED_ENEMIES_THIS_ROUND;
 
     //Game Configuration
+    public static final boolean USE_ADAPTIVE_JUMP = false;
     public static float MOVEMENT_SPEED = -0.5f;
     public static final float GRAVITY = 0.005f;
-    public static final float JUMP_FORCE = 0.2f;
+    public static final float JUMP_FORCE = USE_ADAPTIVE_JUMP ? 0.2f : 1.25f;
     public static final float JUMP_HOLD_FRICTION = .88f;
     public static final float STOMP_FORCE = 1.25f;
     public static final float SQUASH_UPFORCE = 0.75f;
