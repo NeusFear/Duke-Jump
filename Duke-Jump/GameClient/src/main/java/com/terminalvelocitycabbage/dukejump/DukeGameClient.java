@@ -3,6 +3,7 @@ package com.terminalvelocitycabbage.dukejump;
 import com.terminalvelocitycabbage.dukejump.components.*;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.CloseGameController;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.JumpController;
+import com.terminalvelocitycabbage.dukejump.inputcontrollers.StompController;
 import com.terminalvelocitycabbage.dukejump.rendernodes.DrawUIRenderNode;
 import com.terminalvelocitycabbage.dukejump.rendernodes.DrawSceneRenderNode;
 import com.terminalvelocitycabbage.dukejump.scenes.DefaultScene;
@@ -10,7 +11,6 @@ import com.terminalvelocitycabbage.dukejump.systems.*;
 import com.terminalvelocitycabbage.engine.client.ClientBase;
 import com.terminalvelocitycabbage.engine.client.input.control.*;
 import com.terminalvelocitycabbage.engine.client.input.controller.ControlGroup;
-import com.terminalvelocitycabbage.engine.client.input.types.GamepadInput;
 import com.terminalvelocitycabbage.engine.client.input.types.KeyboardInput;
 import com.terminalvelocitycabbage.engine.client.input.types.MouseInput;
 import com.terminalvelocitycabbage.engine.client.renderer.Font;
@@ -124,6 +124,7 @@ public class DukeGameClient extends ClientBase {
     public static final float GRAVITY = 0.005f;
     public static final float JUMP_FORCE = 0.9f;
     public static final float JUMP_HOLD_FRICTION = 0.98f;
+    public static final float STOMP_FORCE = 1.25f;
     public static final float SQUASH_UPFORCE = 0.75f;
     public static final float SCALE = 60f;
     public static final int GROUND_PARTS = 8;
@@ -377,12 +378,16 @@ public class DukeGameClient extends ClientBase {
             Control spacebar = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.SPACE));
             Control w = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.W));
             Control up = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.UP));
+            Control shift = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.LEFT_SHIFT));
+            Control s = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.S));
+            Control down = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.DOWN));
             Control leftClickControl = inputHandler.registerControlListener(new MouseButtonControl(MouseInput.Button.LEFT_CLICK));
             Control mouseScrollUpControl = inputHandler.registerControlListener(new MouseScrollControl(MouseInput.ScrollDirection.UP, 1f));
             Control mouseScrollDownControl = inputHandler.registerControlListener(new MouseScrollControl(MouseInput.ScrollDirection.DOWN, 1f));
             //Register Controllers
             inputHandler.registerController(ID, "exit_game", new CloseGameController(exitControl));
             inputHandler.registerController(ID, "jump", new JumpController(spacebar, w, up));
+            inputHandler.registerController(ID, "stomp", new StompController(shift, s, down));
             inputHandler.registerController(ID, "ui_click", new UIClickController(MouseInput.Button.LEFT_CLICK, leftClickControl));
             inputHandler.registerController(ID, "scroll", new UIScrollController(
                     new ControlGroup(mouseScrollUpControl),
