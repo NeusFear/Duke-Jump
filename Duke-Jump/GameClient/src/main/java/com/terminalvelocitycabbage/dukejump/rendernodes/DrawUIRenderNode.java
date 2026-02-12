@@ -55,7 +55,11 @@ public class DrawUIRenderNode extends UIRenderNode {
                         });
                     }
                     if (mainMenu) {
-                        highScores();
+                        if (DukeGameClient.HIGH_SCORES.isEmpty()) {
+                            tutorialText();
+                        } else {
+                            highScores();
+                        }
                     }
                     if (paused) {
                         //TODO
@@ -77,6 +81,28 @@ public class DrawUIRenderNode extends UIRenderNode {
                         "text-size-[40] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
             });
         }
+    }
+
+    private void lineBreak() {
+        container("h-[20]", () -> {});
+    }
+
+    private void defaultText(String text) {
+        text(text, "text-size-[20] text-wrap-words text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+    }
+
+    private void tutorialText() {
+        container("grow layout-y-[ttb] gap-[5] bg-[1,1,1,1] p-[12]", () -> {
+            text("HOW TO PLAY:", "text-size-[30] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+            lineBreak();
+            defaultText("The goal of the game is to help Duke avoid and squash bugs");
+            lineBreak();
+            defaultText("- Press spacebar/W/up to jump and avoid bugs");
+            lineBreak();
+            defaultText("- Land on bugs' heads to squash them for extra points - harder enemies earn more points!");
+            lineBreak();
+            defaultText("- Save and share your high scores with friends!");
+        });
     }
 
     private void titleText() {
@@ -172,15 +198,6 @@ public class DrawUIRenderNode extends UIRenderNode {
         scrollableContainer(
                 "bg-[1,16,1,1] layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]",
                 "bg-[1,0,0,1] w-[10px] fit-y", () -> {
-                    if (DukeGameClient.HIGH_SCORES.isEmpty()) {
-                        container("grow layout-x-[ltr] gap-[5] bg-[.9,.9,.9,1] p-[4]", () -> {
-                            container("grow", () -> {
-                            });
-                            text("No High Scores Recorded", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
-                            container("grow", () -> {
-                            });
-                        });
-                    }
                     for (int i = 0; i < DukeGameClient.HIGH_SCORES.size(); i++) {
                         DukeGameClient.Score score = DukeGameClient.HIGH_SCORES.get(i);
                         listItem(String.valueOf(i + 1), score.scoreHolder(), String.valueOf(score.score()), false);
