@@ -375,13 +375,15 @@ public class DukeGameClient extends ClientBase {
             var inputHandler = event.getInputHandler();
             //Register Controls
             Control exitControl = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.ESCAPE));
-            Control jumpControl = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.SPACE));
+            Control spacebar = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.SPACE));
+            Control w = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.W));
+            Control up = inputHandler.registerControlListener(new KeyboardKeyControl(KeyboardInput.Key.UP));
             Control leftClickControl = inputHandler.registerControlListener(new MouseButtonControl(MouseInput.Button.LEFT_CLICK));
             Control mouseScrollUpControl = inputHandler.registerControlListener(new MouseScrollControl(MouseInput.ScrollDirection.UP, 1f));
             Control mouseScrollDownControl = inputHandler.registerControlListener(new MouseScrollControl(MouseInput.ScrollDirection.DOWN, 1f));
             //Register Controllers
             inputHandler.registerController(ID, "exit_game", new CloseGameController(exitControl));
-            inputHandler.registerController(ID, "jump", new JumpController(jumpControl));
+            inputHandler.registerController(ID, "jump", new JumpController(spacebar, w, up));
             inputHandler.registerController(ID, "ui_click", new UIClickController(MouseInput.Button.LEFT_CLICK, leftClickControl));
             inputHandler.registerController(ID, "scroll", new UIScrollController(
                     new ControlGroup(mouseScrollUpControl),

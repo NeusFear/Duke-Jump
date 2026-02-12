@@ -9,6 +9,12 @@ How to run the game
 2. Run `git submodule init` to initialize the TerminalVelocityEngine2 submodule
 3. Run the game with main function in `DukeGameClient.java` in your favorite ide
 
+## How to play
+- Use the spacebar to jump
+- Gain points for avoiding bugs
+- Gain extra points for jumping on and quashing bugs
+- Compete with your (local) friends for high scores!
+
 Features:
 - [x] Jump to help Duke dodge bugs
 - [x] Keep score of how many bugs you've avoided
@@ -17,11 +23,7 @@ Features:
 - [x] Bonus points for jumping on (and squashing) bugs
 - [ ] Sounds/Animations for milestones
 - [x] High Scores
-- [ ] Music
 - [ ] Power ups (like a jetpack and laser gun or something idk)
 - [x] Main menu
 - [ ] Pause the game
 - [x] retry (instead of having to restart the game every time)
-- [x] Add backspace to text input
-- [x] Allow pressing enter to submit high score
-- [ ] A simple tutorial to teach new players the controls and objective
