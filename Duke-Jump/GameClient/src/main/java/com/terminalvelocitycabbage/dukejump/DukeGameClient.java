@@ -135,7 +135,8 @@ public class DukeGameClient extends ClientBase {
 
     //Game Configuration
     public static final boolean USE_ADAPTIVE_JUMP = false;
-    public static float MOVEMENT_SPEED = -0.5f;
+    public static final float INITIAL_SPEED = -0.5f;
+    public static float MOVEMENT_SPEED = INITIAL_SPEED;
     public static final float GRAVITY = 0.005f;
     public static final float JUMP_FORCE = USE_ADAPTIVE_JUMP ? 0.2f : 1.25f;
     public static final float JUMP_HOLD_FRICTION = .88f;
@@ -145,6 +146,7 @@ public class DukeGameClient extends ClientBase {
     public static final int GROUND_PARTS = 8;
     public static final int GROUND_Y = -100;
     public static final int PLAYER_POSITION_X = -300;
+    public static final float SPEEDUP_MULTIPLIER = .000005f;
     //Enemies
     public static final int ENEMY = 500;
     public static final float BUG_SPEED_MULTIPLIER = 1.2f;
@@ -177,7 +179,6 @@ public class DukeGameClient extends ClientBase {
             new Color(128, 0, 128, 255)
     };
     public static final float CONFETTI_SPAWN_DURATION = 500; //How long in ms it takes to spawn all the confetti
-    public static final float CONFETTI_SPAWN_INTERVAL = 100; //any multiple of this score causes confetti to spawn
 
     //High Scores
     public static final List<Score> HIGH_SCORES = new ArrayList<>();
@@ -340,6 +341,7 @@ public class DukeGameClient extends ClientBase {
             event.createSystem(AnimateSpritesSystem.class);
             event.createSystem(UpdateConfettiSystem.class);
             event.createSystem(SpawnConfettiSystem.class);
+            event.createSystem(MovementSpeedSystem.class);
         });
         getEventDispatcher().listenToEvent(EntityTemplateRegistrationEvent.EVENT, e -> {
             EntityTemplateRegistrationEvent event = (EntityTemplateRegistrationEvent) e;
@@ -411,6 +413,7 @@ public class DukeGameClient extends ClientBase {
                     .addStep(event.registerStep(ID, "animate_sprites"), AnimateSpritesSystem.class)
                     .addStep(event.registerStep(ID, "update_confetti_positions"), UpdateConfettiSystem.class)
                     .addStep(event.registerStep(ID, "spawn_confetti"), SpawnConfettiSystem.class)
+                    .addStep(event.registerStep(ID, "movement_speed"), MovementSpeedSystem.class)
                     .build());
         });
         getEventDispatcher().listenToEvent(RendererRegistrationEvent.EVENT, e -> {
@@ -462,6 +465,7 @@ public class DukeGameClient extends ClientBase {
     }
 
     public static void restart(boolean returnToMainMenu) {
+        MOVEMENT_SPEED = INITIAL_SPEED;
         ClientBase.getInstance().getStateHandler().getState(DukeGameClient.PASSED_ENEMIES_THIS_ROUND).setValue(0);
         ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).setValue(0);
         ClientBase.getInstance().getManager().getEntitiesWith(EnemyComponent.class).forEach(Entity::free);
