@@ -81,9 +81,20 @@ public class DrawUIRenderNode extends UIRenderNode {
                 text(DukeGameClient.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue().toString(),
                         "text-size-[40] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
             });
-            if (!DukeGameClient.HIGH_SCORES.isEmpty() && ((int) ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue()) > DukeGameClient.HIGH_SCORES.getFirst().score()) {
+            highScoreTextArea();
+        }
+    }
+
+    private void highScoreTextArea() {
+        if (!DukeGameClient.HIGH_SCORES.isEmpty()) {
+            if (((int) ClientBase.getInstance().getStateHandler().getState(DukeGameClient.CURRENT_SCORE).getValue()) > DukeGameClient.HIGH_SCORES.getFirst().score()) {
                 container("float-root z-[10] align-x-[center] align-y-[center] w-[100] h-[30] attach-[top] to-[top] float-offset-y-[80] p-[10]", () -> {
                     text("NEW HIGH SCORE", "text-size-[20] text-color-[1,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+                });
+            } else {
+                container("float-root z-[10] align-x-[center] align-y-[center] w-[100] h-[30] attach-[top] to-[top] float-offset-y-[80] p-[10]", () -> {
+                    text("SCORE TO BEAT: " + DukeGameClient.HIGH_SCORES.getFirst().score(),
+                            "text-size-[14] text-color-[1,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
                 });
             }
         }
