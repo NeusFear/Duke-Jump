@@ -4,6 +4,7 @@ import com.terminalvelocitycabbage.dukejump.components.*;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.CloseGameController;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.JumpController;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.StompController;
+import com.terminalvelocitycabbage.dukejump.rendernodes.DrawConfettiRenderNode;
 import com.terminalvelocitycabbage.dukejump.rendernodes.DrawUIRenderNode;
 import com.terminalvelocitycabbage.dukejump.rendernodes.DrawSceneRenderNode;
 import com.terminalvelocitycabbage.dukejump.scenes.DefaultScene;
@@ -28,11 +29,14 @@ import com.terminalvelocitycabbage.engine.filesystem.resources.ResourceSource;
 import com.terminalvelocitycabbage.engine.filesystem.sources.MainSource;
 import com.terminalvelocitycabbage.engine.graph.Routine;
 import com.terminalvelocitycabbage.engine.registry.Identifier;
+import com.terminalvelocitycabbage.engine.util.Color;
+import com.terminalvelocitycabbage.engine.util.touples.Pair;
 import com.terminalvelocitycabbage.templates.ecs.components.*;
 import com.terminalvelocitycabbage.templates.events.*;
 import com.terminalvelocitycabbage.templates.inputcontrollers.UIClickController;
 import com.terminalvelocitycabbage.templates.inputcontrollers.UIScrollController;
 import com.terminalvelocitycabbage.templates.meshes.SquareDataMesh;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,6 +54,9 @@ public class DukeGameClient extends ClientBase {
     public static Identifier DEFAULT_VERTEX_SHADER;
     public static Identifier DEFAULT_FRAGMENT_SHADER;
     public static ShaderProgramConfig DEFAULT_SHADER_PROGRAM_CONFIG;
+    public static Identifier CONFETTI_VERTEX_SHADER;
+    public static Identifier CONFETTI_FRAGMENT_SHADER;
+    public static ShaderProgramConfig CONFETTI_SHADER_PROGRAM_CONFIG;
 
     //Atlases
     public static Identifier TEXTURE_ATLAS;
@@ -94,6 +101,8 @@ public class DukeGameClient extends ClientBase {
     public static Identifier SOUND_DEATH;
     public static Identifier SOUND_SQUASH_RESOURCE;
     public static Identifier SOUND_SQUASH;
+    public static Identifier SOUND_MILESTONE_RESOURCE;
+    public static Identifier SOUND_MILESTONE;
 
     //Fonts
     public static Identifier PIXEL_FONT_RESOURCE;
@@ -103,6 +112,9 @@ public class DukeGameClient extends ClientBase {
     public static final VertexFormat MESH_FORMAT = VertexFormat.builder()
             .addElement(VertexAttribute.XYZ_POSITION)
             .addElement(VertexAttribute.UV)
+            .build();
+    public static final VertexFormat CONFETTI_FORMAT = VertexFormat.builder()
+            .addElement(VertexAttribute.XYZ_POSITION)
             .build();
     public static Routine DEFAULT_ROUTINE;
     public static Identifier RENDER_GRAPH;
@@ -115,6 +127,7 @@ public class DukeGameClient extends ClientBase {
     public static Identifier FLY_ENTITY;
     public static Identifier BACKGROUND_ENTITY;
     public static Identifier PLAYER_CAMERA_ENTITY;
+    public static Identifier CONFETTI_ENTITY;
 
     //STATES
     public static Identifier CURRENT_SCORE;
@@ -150,6 +163,22 @@ public class DukeGameClient extends ClientBase {
     public static final int BACKGROUND_PARTS = 5;
     public static final float INTERSECTION_RADIUS = SCALE / 2f;
     public static final float SQUASH_OFFSET = INTERSECTION_RADIUS * 0.5f;
+    //Confetti
+    public static final int CONFETTI_COUNT = 100;
+    public static final Vector3f CONFETTI_SPAWN_LOCATION = new Vector3f(0, 220, 5);
+    public static final float CONFETTI_MAX_VERTICAL_VELOCITY = 1.0f;
+    public static final float CONFETTI_MAX_HORIZONTAL_VELOCITY = 1.0f;
+    public static final float CONFETTI_MAX_ROTATIONAL_VELOCITY = 1.0f;
+    public static final float CONFETTI_SCALE = 8.0f;
+    public static final Color[] confettiColors = {
+            new Color(255, 0, 0, 255),
+            new Color(0, 255, 0, 255),
+            new Color(0, 0, 255, 255),
+            new Color(255, 255, 0, 255),
+            new Color(128, 0, 128, 255)
+    };
+    public static final float CONFETTI_SPAWN_DURATION = 500; //How long in ms it takes to spawn all the confetti
+    public static final float CONFETTI_SPAWN_INTERVAL = 100; //any multiple of this score causes confetti to spawn
 
     //High Scores
     public static final List<Score> HIGH_SCORES = new ArrayList<>();
@@ -186,6 +215,18 @@ public class DukeGameClient extends ClientBase {
                     .addUniform(new Uniform("viewMatrix"))
                     .addUniform(new Uniform("modelMatrix"))
                     .build();
+            CONFETTI_VERTEX_SHADER = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SHADER, "confetti.vert").getIdentifier();
+            CONFETTI_FRAGMENT_SHADER = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SHADER, "confetti.frag").getIdentifier();
+            CONFETTI_SHADER_PROGRAM_CONFIG = ShaderProgramConfig.builder()
+                    .vertexFormat(DukeGameClient.CONFETTI_FORMAT)
+                    .addShader(Shader.Type.VERTEX, CONFETTI_VERTEX_SHADER)
+                    .addShader(Shader.Type.FRAGMENT, CONFETTI_FRAGMENT_SHADER)
+                    .addUniform(new Uniform("textureSampler"))
+                    .addUniform(new Uniform("projectionMatrix"))
+                    .addUniform(new Uniform("viewMatrix"))
+                    .addUniform(new Uniform("modelMatrix"))
+                    .addUniform(new Uniform("color"))
+                    .build();
         });
         getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.TEXTURE), e -> {
             ResourceRegistrationEvent event = (ResourceRegistrationEvent) e;
@@ -210,12 +251,14 @@ public class DukeGameClient extends ClientBase {
             SOUND_JUMP_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "jump.ogg").getIdentifier();
             SOUND_DEATH_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "death.ogg").getIdentifier();
             SOUND_SQUASH_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "squash.ogg").getIdentifier();
+            SOUND_MILESTONE_RESOURCE = event.registerResource(CLIENT_RESOURCE_SOURCE, ResourceCategory.SOUND, "milestone.ogg").getIdentifier();
         });
         getEventDispatcher().listenToEvent(SoundRegistrationEvent.EVENT, e -> {
             SoundRegistrationEvent event = (SoundRegistrationEvent) e;
             SOUND_JUMP = event.registerSound(SOUND_JUMP_RESOURCE);
             SOUND_DEATH = event.registerSound(SOUND_DEATH_RESOURCE);
             SOUND_SQUASH = event.registerSound(SOUND_SQUASH_RESOURCE);
+            SOUND_MILESTONE = event.registerSound(SOUND_MILESTONE_RESOURCE);
         });
         getEventDispatcher().listenToEvent(ResourceRegistrationEvent.getEventNameFromCategory(ResourceCategory.FONT), e -> {
             ResourceRegistrationEvent event = (ResourceRegistrationEvent) e;
@@ -283,6 +326,7 @@ public class DukeGameClient extends ClientBase {
             event.registerComponent(AnimatedSpriteComponent.class);
             event.registerComponent(FlyComponent.class);
             event.registerComponent(EnemyComponent.class);
+            event.registerComponent(ConfettiComponent.class);
         });
         getEventDispatcher().listenToEvent(EntitySystemRegistrationEvent.EVENT, e -> {
             EntitySystemRegistrationEvent event = (EntitySystemRegistrationEvent) e;
@@ -295,6 +339,8 @@ public class DukeGameClient extends ClientBase {
             event.createSystem(CheckForCollisionSystem.class);
             event.createSystem(CountPassedBugsSystem.class);
             event.createSystem(AnimateSpritesSystem.class);
+            event.createSystem(UpdateConfettiSystem.class);
+            event.createSystem(SpawnConfettiSystem.class);
         });
         getEventDispatcher().listenToEvent(EntityTemplateRegistrationEvent.EVENT, e -> {
             EntityTemplateRegistrationEvent event = (EntityTemplateRegistrationEvent) e;
@@ -346,6 +392,11 @@ public class DukeGameClient extends ClientBase {
                 entity.addComponent(TransformationComponent.class).setPosition(-300, 80, -2).setScale((SCALE+1)*8f);
                 entity.addComponent(BackgroundComponent.class);
             });
+            CONFETTI_ENTITY = event.createEntityTemplate(ID, "confetti", entity -> {
+                entity.addComponent(TransformationComponent.class).setPosition(CONFETTI_SPAWN_LOCATION).setScale(CONFETTI_SCALE);
+                entity.addComponent(VelocityComponent.class);
+                entity.addComponent(ConfettiComponent.class);
+            });
         });
         getEventDispatcher().listenToEvent(RoutineRegistrationEvent.EVENT, e -> {
             RoutineRegistrationEvent event = (RoutineRegistrationEvent) e;
@@ -359,6 +410,8 @@ public class DukeGameClient extends ClientBase {
                     .addStep(event.registerStep(ID, "check_for_collision"), CheckForCollisionSystem.class)
                     .addStep(event.registerStep(ID, "count_passed_bugs"), CountPassedBugsSystem.class)
                     .addStep(event.registerStep(ID, "animate_sprites"), AnimateSpritesSystem.class)
+                    .addStep(event.registerStep(ID, "update_confetti_positions"), UpdateConfettiSystem.class)
+                    .addStep(event.registerStep(ID, "spawn_confetti"), SpawnConfettiSystem.class)
                     .build());
         });
         getEventDispatcher().listenToEvent(RendererRegistrationEvent.EVENT, e -> {
@@ -367,6 +420,7 @@ public class DukeGameClient extends ClientBase {
                     new RenderGraph(RenderGraph.RenderPath.builder()
                             .addRoutineNode(DEFAULT_ROUTINE)
                             .addRenderNode(event.registerNode(ID, "draw_scene"), DrawSceneRenderNode.class, DEFAULT_SHADER_PROGRAM_CONFIG)
+                            .addRenderNode(event.registerNode(ID, "draw_confetti"), DrawConfettiRenderNode.class, CONFETTI_SHADER_PROGRAM_CONFIG)
                             .addRenderNode(event.registerNode(ID, "draw_ui"), DrawUIRenderNode.class, ShaderProgramConfig.EMPTY)
                     )
             );

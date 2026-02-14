@@ -52,7 +52,6 @@ public class DrawSceneRenderNode extends RenderNode {
             if (mesh.getFormat().equals(shaderProgram.getConfig().getVertexFormat())) mesh.render();
         }
 
-        glClearColor(0f, 0f, 1f, 1.0f);
         shaderProgram.unbind();
     }
 }
