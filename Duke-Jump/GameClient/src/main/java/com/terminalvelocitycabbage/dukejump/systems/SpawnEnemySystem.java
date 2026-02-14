@@ -13,7 +13,7 @@ public class SpawnEnemySystem extends System {
     @Override
     public void update(Manager manager, float deltaTime) {
 
-        if (!(boolean) DukeGameClient.isAlive()) return;
+        if (DukeGameClient.isPaused() || !(boolean) DukeGameClient.isAlive()) return;
 
         if (duration > (DukeGameClient.BUG_FREQUENCY + variation)) {
             duration -= DukeGameClient.BUG_FREQUENCY;

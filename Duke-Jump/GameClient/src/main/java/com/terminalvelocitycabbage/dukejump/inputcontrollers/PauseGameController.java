@@ -5,14 +5,14 @@ import com.terminalvelocitycabbage.engine.client.input.control.Control;
 import com.terminalvelocitycabbage.engine.client.input.controller.BooleanController;
 import com.terminalvelocitycabbage.engine.client.input.types.ButtonAction;
 
-public class CloseGameController extends BooleanController {
+public class PauseGameController extends BooleanController {
 
-    public CloseGameController(Control... controls) {
+    public PauseGameController(Control... controls) {
         super(ButtonAction.PRESSED, false, controls);
     }
 
     @Override
     public void act() {
-        if (isEnabled()) DukeGameClient.getInstance().getWindowManager().closeFocusedWindow();
+        if (isEnabled()) DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.PAUSED);
     }
 }

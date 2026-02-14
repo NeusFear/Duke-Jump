@@ -13,6 +13,7 @@ public class GravitySystem extends System {
     @Override
     public void update(Manager manager, float deltaTime) {
         manager.getEntitiesWith(VelocityComponent.class).forEach(entity -> {
+            if (DukeGameClient.isPaused()) return;
             if (entity.hasComponent(ConfettiComponent.class)) return;
             if (!entity.hasComponent(SquashedComponent.class) && entity.getComponent(TransformationComponent.class).getPosition().y < DukeGameClient.GROUND_Y) {
                 entity.getComponent(VelocityComponent.class).setVelocity(0, 0, 0);

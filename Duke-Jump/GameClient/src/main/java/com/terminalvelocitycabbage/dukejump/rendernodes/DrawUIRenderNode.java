@@ -64,15 +64,14 @@ public class DrawUIRenderNode extends UIRenderNode {
                         }
                     }
                     if (paused) {
-                        //TODO
-                        container("layout-y-[ttb] grow-x h-[300px] p-[10] gap-[5]", () -> {
-                            text("PAUSED", "text-size-[20] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+                        container("layout-y-[ttb] grow-x align-x-[center]", () -> {
+                            text("PAUSED", "grow-x text-size-[60] text-color-[1,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
                         });
                     }
                     container("grow-x h-[80] py-[10] gap-[10]", () -> {
                         if (!dead) {
-                            playButton();
-                            quitButton();
+                            playButton(DukeGameClient.isPaused());
+                            quitButton(DukeGameClient.isPaused());
                         }
                     });
                 });
@@ -214,12 +213,16 @@ public class DrawUIRenderNode extends UIRenderNode {
                 });
     }
 
-    private void playButton() {
+    private void playButton(boolean isPaused) {
 
         int buttonID = id("playButton");
 
         if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
-            DukeGameClient.restart(false);
+            if (isPaused) {
+                DukeGameClient.getInstance().getStateHandler().updateState(DukeGameClient.GAME_STATE, DukeGameClient.GameState.GAME_RUNNING);
+            } else {
+                DukeGameClient.restart(false);
+            }
         }
 
         container(buttonID, "grow py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
@@ -227,17 +230,20 @@ public class DrawUIRenderNode extends UIRenderNode {
         });
     }
 
-    private void quitButton() {
+    private void quitButton(boolean returnToMainMenuInstead) {
 
         int buttonID = id("quitButton");
 
         if (heardEvent(buttonID, UIClickEvent.EVENT) instanceof UIClickEvent) {
-            DukeGameClient.getInstance().getWindowManager().closeFocusedWindow();
-            Log.info("Quit button clicked, closing focused window");
+            if (returnToMainMenuInstead) {
+                DukeGameClient.restart(true);
+            } else {
+                DukeGameClient.getInstance().getWindowManager().closeFocusedWindow();
+            }
         }
 
         container(buttonID, "grow py-[5] align-x-[center] align-y-[center] border-width-[3] border-color-[0,0,0,1] " + (isHovered(buttonID) ? "bg-[.95,.95,.95,1]" : "bg-[1,1,1,1]"), () -> {
-            text("QUIT", "text-size-[40] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
+            text(returnToMainMenuInstead ? "MAIN MENU" : "QUIT GAME", "text-size-[40] text-color-[0,0,0,1] font-[" + DukeGameClient.PIXEL_FONT + "]");
         });
     }
 }

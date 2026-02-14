@@ -1,7 +1,7 @@
 package com.terminalvelocitycabbage.dukejump;
 
 import com.terminalvelocitycabbage.dukejump.components.*;
-import com.terminalvelocitycabbage.dukejump.inputcontrollers.CloseGameController;
+import com.terminalvelocitycabbage.dukejump.inputcontrollers.PauseGameController;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.JumpController;
 import com.terminalvelocitycabbage.dukejump.inputcontrollers.StompController;
 import com.terminalvelocitycabbage.dukejump.rendernodes.DrawConfettiRenderNode;
@@ -30,7 +30,6 @@ import com.terminalvelocitycabbage.engine.filesystem.sources.MainSource;
 import com.terminalvelocitycabbage.engine.graph.Routine;
 import com.terminalvelocitycabbage.engine.registry.Identifier;
 import com.terminalvelocitycabbage.engine.util.Color;
-import com.terminalvelocitycabbage.engine.util.touples.Pair;
 import com.terminalvelocitycabbage.templates.ecs.components.*;
 import com.terminalvelocitycabbage.templates.events.*;
 import com.terminalvelocitycabbage.templates.inputcontrollers.UIClickController;
@@ -445,7 +444,7 @@ public class DukeGameClient extends ClientBase {
             Control mouseScrollUpControl = inputHandler.registerControlListener(new MouseScrollControl(MouseInput.ScrollDirection.UP, 1f));
             Control mouseScrollDownControl = inputHandler.registerControlListener(new MouseScrollControl(MouseInput.ScrollDirection.DOWN, 1f));
             //Register Controllers
-            inputHandler.registerController(ID, "exit_game", new CloseGameController(exitControl));
+            inputHandler.registerController(ID, "exit_game", new PauseGameController(exitControl));
             inputHandler.registerController(ID, "jump", new JumpController(spacebar, w, up));
             inputHandler.registerController(ID, "stomp", new StompController(shift, s, down));
             inputHandler.registerController(ID, "ui_click", new UIClickController(MouseInput.Button.LEFT_CLICK, leftClickControl));
@@ -495,6 +494,10 @@ public class DukeGameClient extends ClientBase {
 
     public static boolean isAlive() {
         return DukeGameClient.getInstance().getStateHandler().getState(GAME_STATE).getValue().equals(GameState.GAME_RUNNING);
+    }
+
+    public static boolean isPaused() {
+        return DukeGameClient.getInstance().getStateHandler().getState(GAME_STATE).getValue().equals(GameState.PAUSED);
     }
 
     public record Score(String scoreHolder, int score) implements Comparable<Score> {

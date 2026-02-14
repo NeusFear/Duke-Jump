@@ -11,6 +11,7 @@ public class UpdateBackgroundPositionsSystem extends System {
     @Override
     public void update(Manager manager, float deltaTime) {
 
+        if (DukeGameClient.isPaused()) return;
         boolean alive = DukeGameClient.isAlive();
 
         manager.getEntitiesWith(BackgroundComponent.class, TransformationComponent.class).forEach(entity -> {

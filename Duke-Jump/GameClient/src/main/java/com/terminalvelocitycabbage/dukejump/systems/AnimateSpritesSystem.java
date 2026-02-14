@@ -16,6 +16,8 @@ public class AnimateSpritesSystem extends System {
     public void update(Manager manager, float deltaTime) {
         manager.getEntitiesWith(AnimatedSpriteComponent.class, ModelComponent.class).forEach(entity -> {
 
+            if (DukeGameClient.isPaused()) return;
+
             String state = "walk";
 
             var transformation = entity.getComponent(TransformationComponent.class);

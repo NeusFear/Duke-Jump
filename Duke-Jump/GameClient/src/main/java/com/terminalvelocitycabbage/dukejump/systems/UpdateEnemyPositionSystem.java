@@ -17,6 +17,7 @@ public class UpdateEnemyPositionSystem extends System {
     @Override
     public void update(Manager manager, float deltaTime) {
 
+        if (DukeGameClient.isPaused()) return;
         boolean alive = DukeGameClient.isAlive();
 
         manager.getEntitiesWith(EnemyComponent.class).forEach(entity -> {

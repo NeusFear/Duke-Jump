@@ -11,6 +11,7 @@ public class UpdateGroundPositionsSystem extends System {
     @Override
     public void update(Manager manager, float deltaTime) {
 
+        if (DukeGameClient.isPaused()) return;
         if (!(boolean) DukeGameClient.isAlive()) return;
 
         manager.getEntitiesWith(GroundComponent.class, TransformationComponent.class).forEach(entity -> {
